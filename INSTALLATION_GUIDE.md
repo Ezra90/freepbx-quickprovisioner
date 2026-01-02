@@ -1,941 +1,713 @@
-# FreePBX QuickProvisioner - Comprehensive Installation Guide
+# RasPBX QuickProvisioner Installation Guide
 
-**Last Updated:** 2026-01-02
-**Compatible with:** Asterisk 22, PHP 8.2, MariaDB, Apache2, Raspberry Pi OS
-
----
+This guide provides comprehensive instructions for installing and configuring RasPBX with the QuickProvisioner module on a Raspberry Pi.
 
 ## Table of Contents
 
-1. [Windows Preparation (USB Flashing Only)](#windows-preparation-usb-flashing-only)
-2. [Raspberry Pi RasPBX Setup](#raspberry-pi-raspbx-setup)
-3. [GitHub SSH Key Configuration](#github-ssh-key-configuration)
-4. [Module Installation](#module-installation)
-5. [Permission Management](#permission-management)
-6. [Post-Installation Verification](#post-installation-verification)
-7. [Maintenance and Updates](#maintenance-and-updates)
-8. [Common Issues and Solutions](#common-issues-and-solutions)
-9. [Support and Troubleshooting](#support-and-troubleshooting)
-10. [Security Recommendations](#security-recommendations)
+1. [Prerequisites](#prerequisites)
+2. [Windows USB Preparation](#windows-usb-preparation)
+3. [Raspberry Pi OS Setup](#raspberry-pi-os-setup)
+4. [GitHub SSH Key Configuration](#github-ssh-key-configuration)
+5. [FreePBX and Module Installation](#freepbx-and-module-installation)
+6. [QuickProvisioner Module Installation](#quickprovisioner-module-installation)
+7. [Post-Installation Configuration](#post-installation-configuration)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Windows Preparation (USB Flashing Only)
+## Prerequisites
 
-> **Note:** This section is exclusively for creating a bootable USB drive to install RasPBX on Raspberry Pi. Windows is NOT used to run FreePBX or any FreePBX services.
+Before you begin, ensure you have the following:
 
-### Prerequisites
+- **Hardware:**
+  - Raspberry Pi 4 or later (recommended: 4GB RAM or higher)
+  - MicroSD card (32GB or larger recommended)
+  - USB card reader
+  - Ethernet cable or WiFi connectivity
+  - Power supply (5V/3A or higher)
 
-- **USB Drive:** 8GB or larger (will be erased)
-- **Windows PC:** Windows 7 or later
-- **RasPBX ISO File:** Download from [RasPBX Downloads](https://www.raspbx.org/downloads/)
+- **Software:**
+  - Raspberry Pi Imager (download from [raspberrypi.com](https://www.raspberrypi.com/software/))
+  - SSH client (built-in on macOS/Linux, PuTTY on Windows)
+  - Text editor for configuration files
 
-### Step 1: Download Required Tools
-
-Download one of the following USB flashing tools:
-
-- **Balena Etcher (Recommended):** [https://www.balena.io/etcher/](https://www.balena.io/etcher/)
-- **Rufus:** [https://rufus.ie/](https://rufus.ie/)
-- **Win32 Disk Imager:** [https://sourceforge.net/projects/win32diskimager/](https://sourceforge.net/projects/win32diskimager/)
-
-### Step 2: Prepare USB Drive
-
-1. Insert USB drive into Windows PC
-2. **WARNING:** This will erase all data on the USB drive
-3. Open Balena Etcher (or chosen flashing tool)
-4. Click "Flash from file" and select the RasPBX `.iso` file
-5. Click "Select target" and choose your USB drive
-6. Click "Flash" and wait for completion (typically 5-10 minutes)
-7. Eject the USB drive safely when complete
-
-### Step 3: Boot Raspberry Pi from USB
-
-1. Insert the flashed USB drive into Raspberry Pi
-2. Power on the Raspberry Pi
-3. System should boot from USB and begin installation
-4. Follow Raspberry Pi RasPBX setup instructions in the next section
+- **Access:**
+  - Internet connection
+  - GitHub account with SSH key capability
+  - Familiarity with Linux command line
 
 ---
 
-## Raspberry Pi RasPBX Setup
+## Windows USB Preparation
 
-### Hardware Requirements
+### Step 1: Download Raspberry Pi Imager
 
-- **Raspberry Pi:** Model 3B+, 4B, or 5 (recommended: 4B+ with 2GB+ RAM)
-- **Power Supply:** 5V/3A (minimum for Pi 4B)
-- **Storage:** microSD card 16GB or larger, or USB 3.0 drive for Pi 5
-- **Network:** Ethernet connection (recommended) or WiFi adapter
-- **USB Drive:** 8GB+ for initial installation media (if not using pre-flashed microSD)
+1. Visit [raspberrypi.com/software](https://www.raspberrypi.com/software/)
+2. Download the Windows version of Raspberry Pi Imager
+3. Run the installer and follow the on-screen instructions
 
-### Installation Steps
+### Step 2: Prepare the MicroSD Card
 
-#### Option A: Using Pre-Flashed microSD Card
+1. Insert the MicroSD card into your USB card reader
+2. Connect the card reader to your Windows PC
+3. Open Raspberry Pi Imager
 
-1. Insert flashed microSD card into Raspberry Pi
-2. Connect Ethernet cable (optional but recommended)
-3. Power on Raspberry Pi
-4. Wait 3-5 minutes for initial boot and setup
-5. Access web interface at `http://<raspberry-pi-ip>` or `http://raspbx.local`
-6. Default credentials: `admin` / `admin` (change immediately)
+### Step 3: Select OS and Configure
 
-#### Option B: Using USB Installation Media
+1. Click **"CHOOSE OS"**
+2. Select **Raspberry Pi OS (64-bit)** - recommended for RasPBX
+3. Click **"CHOOSE STORAGE"**
+4. Select your MicroSD card (verify the size to ensure you select the correct device)
 
-1. Flash RasPBX to USB drive using Windows Preparation steps
-2. Insert USB drive into Raspberry Pi
-3. Power on Raspberry Pi
-4. Follow on-screen installation prompts
-5. Select microSD card as installation target
-6. Complete installation and reboot
+### Step 4: Configure Advanced Options
 
-### Initial RasPBX Configuration
+1. Click the **gear icon** to access advanced options
+2. Enable the following:
+   - **Set hostname:** `raspbx` (or your preferred name)
+   - **Enable SSH:** Check this box and select "Use password authentication"
+   - **Set username and password:** Use `root` as username with a secure password
+   - **Configure wireless LAN:** (optional) Enter your WiFi SSID and password
+   - **Set locale settings:** Set your timezone and keyboard layout
+3. Click **"SAVE"**
 
-After accessing the web interface:
+### Step 5: Write to SD Card
 
-1. **Change Default Credentials**
-   ```
-   Username: admin
-   New Password: [Strong password with letters, numbers, symbols]
-   ```
+1. Click **"WRITE"** in the main Imager window
+2. Confirm the warning dialog
+3. Wait for the process to complete (5-15 minutes depending on card speed)
+4. Click **"CONTINUE"** when finished
+5. Eject the card and remove it from your PC
 
-2. **Configure Network Settings**
-   - Set static IP address (recommended)
-   - Configure DNS servers
-   - Enable/disable WiFi as needed
+---
 
-3. **System Locale and Timezone**
-   - Select appropriate timezone
-   - Configure language preferences
-   - Set system time (NTP recommended)
+## Raspberry Pi OS Setup
 
-4. **Enable Essential Services**
-   - Verify Asterisk is running
-   - Verify MariaDB is running
-   - Verify Apache2 is running
+### Step 1: Initial Boot
+
+1. Insert the prepared MicroSD card into your Raspberry Pi
+2. Connect the Ethernet cable (if not using WiFi)
+3. Power on the Raspberry Pi
+4. Wait 2-3 minutes for initial setup to complete
+
+### Step 2: Connect via SSH
+
+**From macOS/Linux:**
+```bash
+ssh root@raspbx.local
+# Or use the IP address if .local doesn't resolve:
+# ssh root@<raspberry-pi-ip>
+```
+
+**From Windows (using PuTTY):**
+1. Open PuTTY
+2. Enter `raspbx.local` (or IP address) in the Host Name field
+3. Set port to 22
+4. Click "Open"
+5. Login with username `root` and the password you configured
+
+### Step 3: Update System
+
+```bash
+apt-get update
+apt-get upgrade -y
+apt-get install -y curl wget git openssh-server sudo
+```
+
+### Step 4: Disable WiFi and Bluetooth (if required)
+
+**Disable WiFi:**
+```bash
+# Edit the network configuration
+nano /boot/firmware/cmdline.txt
+```
+
+Add the following to the end of the line (without creating a new line):
+```
+dtoverlay=disable-wifi
+```
+
+Save with Ctrl+X, then Y, then Enter.
+
+**Disable Bluetooth:**
+```bash
+# Edit the configuration file
+nano /boot/firmware/config.txt
+```
+
+Add the following lines at the end:
+```
+dtoverlay=disable-bt
+```
+
+Save with Ctrl+X, then Y, then Enter.
+
+**Reboot to apply changes:**
+```bash
+reboot
+```
+
+### Step 5: Configure Static IP (Optional)
+
+For a more stable installation, configure a static IP address:
+
+```bash
+nano /etc/dhcpcd.conf
+```
+
+Add the following lines at the end:
+```
+# For Ethernet (eth0)
+interface eth0
+static ip_address=192.168.1.100/24
+static routers=192.168.1.1
+static domain_name_servers=8.8.8.8 8.8.4.4
+
+# For WiFi (wlan0) - if applicable
+# interface wlan0
+# static ip_address=192.168.1.101/24
+# static routers=192.168.1.1
+# static domain_name_servers=8.8.8.8 8.8.4.4
+```
+
+Save and reboot:
+```bash
+reboot
+```
 
 ---
 
 ## GitHub SSH Key Configuration
 
-This section enables secure cloning and pushing to GitHub repositories without entering credentials repeatedly.
-
-### Generate SSH Key on Raspberry Pi
+### Step 1: Generate SSH Key Pair
 
 ```bash
-# SSH into your Raspberry Pi
-ssh pi@<raspberry-pi-ip>
-
-# Generate SSH key pair
-ssh-keygen -t ed25519 -C "your-email@example.com"
-
-# When prompted:
-# - File location: Press Enter (default: ~/.ssh/id_ed25519)
-# - Passphrase: [Enter strong passphrase]
-# - Confirm passphrase: [Repeat passphrase]
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
 ```
 
-### Display and Copy Public Key
+This creates two files:
+- `~/.ssh/id_rsa` (private key - keep secure)
+- `~/.ssh/id_rsa.pub` (public key - share with GitHub)
+
+### Step 2: Display Your Public Key
 
 ```bash
-# Display your public key
-cat ~/.ssh/id_ed25519.pub
-
-# Copy the entire output starting with "ssh-ed25519"
+cat ~/.ssh/id_rsa.pub
 ```
 
-### Add Public Key to GitHub
+Copy the entire output (it will look like `ssh-rsa AAAA...`).
 
-1. Log in to [GitHub](https://github.com)
-2. Navigate to **Settings → SSH and GPG keys**
+### Step 3: Add SSH Key to GitHub
+
+1. Log in to your GitHub account
+2. Navigate to **Settings** > **SSH and GPG keys**
 3. Click **New SSH key**
-4. **Title:** FreePBX QuickProvisioner (or descriptive name)
-5. **Key type:** Authentication Key
-6. **Key:** Paste your public key from above
-7. Click **Add SSH key**
+4. Give it a title like "RasPBX Installation"
+5. Paste the public key content into the key field
+6. Click **Add SSH key**
 
-### Test SSH Connection
+### Step 4: Test SSH Connection
 
 ```bash
-# Test connection to GitHub
 ssh -T git@github.com
-
-# Expected output: "Hi [username]! You've successfully authenticated..."
 ```
 
-### Configure Git (Optional but Recommended)
-
-```bash
-# Set global Git configuration
-git config --global user.name "Your Name"
-git config --global user.email "your-email@example.com"
-
-# Set default branch name
-git config --global init.defaultBranch main
+You should see a message like:
 ```
-
-### Clone Repository Using SSH
-
-```bash
-# Clone using SSH (requires SSH key configured)
-git clone git@github.com:Ezra90/freepbx-quickprovisioner.git
-
-# Navigate to repository
-cd freepbx-quickprovisioner
+Hi Ezra90! You've successfully authenticated, but GitHub does not provide shell access.
 ```
 
 ---
 
-## Module Installation
+## FreePBX and Module Installation
 
-FreePBX requires the installation and configuration of essential modules for full functionality. All listed modules must be installed and enabled.
-
-### Required FreePBX Modules
-
-| Module | Purpose | Version |
-|--------|---------|---------|
-| **arimanager** | ARI (Asterisk REST Interface) management | Latest |
-| **backup** | System backup and restore functionality | Latest |
-| **bulkhandler** | Bulk operations and batch processing | Latest |
-| **callrecording** | Call recording and playback management | Latest |
-| **core** | Core FreePBX framework and features | Latest |
-| **dashboard** | Admin dashboard and statistics | Latest |
-| **filestore** | File storage management | Latest |
-| **framework** | FreePBX framework and libraries | Latest |
-| **manager** | Manager interface for system control | Latest |
-| **miscapps** | Miscellaneous applications | Latest |
-| **pm2** | Process manager integration | Latest |
-| **recordings** | Recording management and playback | Latest |
-| **sipsettings** | SIP configuration and settings | Latest |
-| **soundlang** | Sound files and language management | Latest |
-| **voicemail** | Voicemail system and management | Latest |
-
-### Installation Methods
-
-#### Method 1: Web Interface Installation
-
-1. Log in to FreePBX web interface (http://<raspberry-pi-ip>)
-2. Navigate to **Admin → Modules → Manage**
-3. Search for each module listed above
-4. Click **Download** next to each module
-5. After download completes, click **Install**
-6. Repeat for all listed modules
-7. Navigate to **Admin → Modules → Admin** to enable each module
-8. Apply changes at the top of the page
-
-#### Method 2: Command Line Installation
+### Step 1: Install Required Dependencies
 
 ```bash
-# SSH into Raspberry Pi
-ssh pi@<raspberry-pi-ip>
-
-# Change to FreePBX directory
-cd /var/www/html
-
-# Download a module (example: arimanager)
-fwconsole ma download arimanager
-
-# Install the module
-fwconsole ma install arimanager
-
-# Enable the module
-fwconsole ma enable arimanager
-
-# Repeat for all required modules
-fwconsole ma download backup && fwconsole ma install backup && fwconsole ma enable backup
-fwconsole ma download bulkhandler && fwconsole ma install bulkhandler && fwconsole ma enable bulkhandler
-fwconsole ma download callrecording && fwconsole ma install callrecording && fwconsole ma enable callrecording
-fwconsole ma download core && fwconsole ma install core && fwconsole ma enable core
-fwconsole ma download dashboard && fwconsole ma install dashboard && fwconsole ma enable dashboard
-fwconsole ma download filestore && fwconsole ma install filestore && fwconsole ma enable filestore
-fwconsole ma download framework && fwconsole ma install framework && fwconsole ma enable framework
-fwconsole ma download manager && fwconsole ma install manager && fwconsole ma enable manager
-fwconsole ma download miscapps && fwconsole ma install miscapps && fwconsole ma enable miscapps
-fwconsole ma download pm2 && fwconsole ma install pm2 && fwconsole ma enable pm2
-fwconsole ma download recordings && fwconsole ma install recordings && fwconsole ma enable recordings
-fwconsole ma download sipsettings && fwconsole ma install sipsettings && fwconsole ma enable sipsettings
-fwconsole ma download soundlang && fwconsole ma install soundlang && fwconsole ma enable soundlang
-fwconsole ma download voicemail && fwconsole ma install voicemail && fwconsole ma enable voicemail
+apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    git \
+    php \
+    php-cli \
+    php-mysql \
+    php-mbstring \
+    php-xml \
+    php-json \
+    php-curl \
+    php-gd \
+    php-intl \
+    mariadb-server \
+    mariadb-client \
+    apache2 \
+    libapache2-mod-php \
+    npm \
+    nodejs
 ```
 
-### Verify Module Installation
+### Step 2: Start Required Services
+
+```bash
+# Enable and start MariaDB
+systemctl enable mariadb
+systemctl start mariadb
+
+# Enable and start Apache
+systemctl enable apache2
+systemctl start apache2
+```
+
+### Step 3: Install Asterisk (if not already installed)
+
+RasPBX typically comes with Asterisk, but verify:
+
+```bash
+asterisk -v
+```
+
+If not installed, follow the [Asterisk Installation Guide](https://wiki.asterisk.org/wiki/display/AST/Building+and+Installing+Asterisk+from+Source).
+
+### Step 4: Prepare FreePBX Installation Directory
+
+```bash
+cd /opt
+mkdir -p freepbx
+cd freepbx
+```
+
+### Step 5: Install FreePBX Core
+
+```bash
+# Download FreePBX
+wget http://mirror.freepbx.org/modules/packages/freepbx/freepbx-16.0-latest.tgz
+
+# Extract the archive
+tar -xzf freepbx-16.0-latest.tgz
+cd freepbx
+
+# Run the installation
+./install -n
+```
+
+### Step 6: Install FreePBX Modules
+
+FreePBX modules extend the core functionality. Install all 16 recommended modules:
+
+```bash
+cd /opt/freepbx
+
+# 1. ARI Manager - Asterisk REST Interface management
+fwconsole ma install arimanager
+
+# 2. Backup - System backup and restore functionality
+fwconsole ma install backup
+
+# 3. Built-in - Core built-in features
+fwconsole ma install builtin
+
+# 4. Bulk Handler - Bulk operations management
+fwconsole ma install bulkhandler
+
+# 5. Call Recording - Record and manage call recordings
+fwconsole ma install callrecording
+
+# 6. Core - Core FreePBX functionality
+fwconsole ma install core
+
+# 7. Dashboard - Admin dashboard interface
+fwconsole ma install dashboard
+
+# 8. File Store - File storage management
+fwconsole ma install filestore
+
+# 9. Framework - Core framework and utilities
+fwconsole ma install framework
+
+# 10. Manager - Advanced module manager
+fwconsole ma install manager
+
+# 11. Miscellaneous Applications - Additional utilities
+fwconsole ma install miscapps
+
+# 12. PM2 - Process manager for Node.js applications
+fwconsole ma install pm2
+
+# 13. Recordings - Voicemail and call recording management
+fwconsole ma install recordings
+
+# 14. SIP Settings - SIP configuration and management
+fwconsole ma install sipsettings
+
+# 15. Sound Languages - Multi-language sound support
+fwconsole ma install soundlang
+
+# 16. Voicemail - Voicemail system management
+fwconsole ma install voicemail
+
+# Enable all modules
+fwconsole ma enable arimanager backup builtin bulkhandler callrecording core dashboard filestore framework manager miscapps pm2 recordings sipsettings soundlang voicemail
+
+# Reload the FreePBX system
+fwconsole reload
+```
+
+### Step 7: Verify Module Installation
 
 ```bash
 # List all installed modules
 fwconsole ma list
 
-# Check status of specific module
-fwconsole ma status arimanager
-
-# Reload FreePBX to apply changes
-fwconsole reload
-```
-
-### Troubleshoot Module Installation
-
-```bash
-# If modules fail to download, check internet connection
-ping 8.8.8.8
-
-# Check FreePBX logs
-tail -f /var/log/asterisk/freepbx_engine.log
-
-# Restart Apache and Asterisk if modules not loading
-sudo systemctl restart apache2
-sudo systemctl restart asterisk
+# You should see all 16 modules listed with their status
 ```
 
 ---
 
-## Permission Management
+## Permission Management for Asterisk User
 
-### Verify File and Directory Permissions
-
-Proper permissions are critical for FreePBX security and functionality.
-
-#### Check Current Permissions
+### Step 1: Create or Verify Asterisk User
 
 ```bash
-# Check FreePBX directory permissions
-ls -la /var/www/html/admin/
+# Check if asterisk user exists
+id asterisk
 
-# Check Asterisk directory permissions
-ls -la /etc/asterisk/
+# If not found, create it
+useradd -m -s /bin/bash asterisk
 
-# Check logs directory permissions
-ls -la /var/log/asterisk/
+# Add asterisk to necessary groups
+usermod -aG audio,dialout asterisk
 ```
 
-#### Standard Permission Configuration
+### Step 2: Set Directory Permissions
 
 ```bash
-# Set FreePBX directory ownership
-sudo chown -R asterisk:asterisk /var/www/html
+# Set permissions for FreePBX directory
+chown -R asterisk:asterisk /opt/freepbx
+chmod -R 755 /opt/freepbx
 
-# Set proper directory permissions
-sudo chmod -R 755 /var/www/html
+# Set permissions for Asterisk configuration
+chown -R asterisk:asterisk /etc/asterisk
+chmod -R 755 /etc/asterisk
 
-# Set proper file permissions
-sudo find /var/www/html -type f -exec chmod 644 {} \;
+# Set permissions for Asterisk sounds and media
+chown -R asterisk:asterisk /var/lib/asterisk
+chmod -R 755 /var/lib/asterisk
 
-# Set Asterisk config permissions
-sudo chown -R asterisk:asterisk /etc/asterisk
-sudo chmod -R 755 /etc/asterisk
+# Set permissions for Asterisk logs
+chown -R asterisk:asterisk /var/log/asterisk
+chmod -R 755 /var/log/asterisk
 
-# Set voicemail permissions
-sudo chmod -R 755 /var/spool/asterisk/voicemail
-
-# Set recording permissions
-sudo chmod -R 755 /var/spool/asterisk/monitor
+# Set permissions for Asterisk spool (recordings, voicemail)
+chown -R asterisk:asterisk /var/spool/asterisk
+chmod -R 755 /var/spool/asterisk
 ```
 
-#### User Groups and Access Control
+### Step 3: Configure Asterisk Service to Run as Asterisk User
 
 ```bash
-# Add your user to asterisk group
-sudo usermod -aG asterisk $USER
-
-# Verify group membership
-groups $USER
-
-# Log out and log back in for changes to take effect
+nano /etc/default/asterisk
 ```
 
-### FreePBX Web Interface Permissions
-
-Navigate to **Admin → System Admin → Backup & Restore** to configure:
-- Backup directories
-- File access permissions
-- User account restrictions
-
----
-
-## Post-Installation Verification
-
-### System Health Check
-
-```bash
-# Check system resources
-free -h
-df -h
-
-# Check Asterisk status
-sudo systemctl status asterisk
-
-# Check MariaDB status
-sudo systemctl status mariadb
-
-# Check Apache2 status
-sudo systemctl status apache2
-
-# Check Asterisk uptime
-asterisk -rx "core show uptime"
+Ensure the following lines are present:
+```
+AST_USER="asterisk"
+AST_GROUP="asterisk"
 ```
 
-### Service Verification
+### Step 4: Restart Asterisk
 
 ```bash
-# Verify Asterisk is listening on SIP port
-sudo netstat -tlnp | grep asterisk
+systemctl restart asterisk
 
-# Verify MariaDB is listening
-sudo netstat -tlnp | grep mysqld
-
-# Verify Apache is listening
-sudo netstat -tlnp | grep apache
-```
-
-### Web Interface Access
-
-1. Open web browser
-2. Navigate to `http://<raspberry-pi-ip>`
-3. Log in with admin credentials
-4. Verify all modules are listed as "Enabled"
-5. Check **Admin → System Admin → System Status** for warnings
-
-### Asterisk Console Access
-
-```bash
-# Connect to Asterisk console
-sudo asterisk -rvvv
-
-# Common diagnostic commands:
-core show uptime
-core show channels
-sip show peers
-sip show channels
-voicemail show users
-```
-
-### Test Dial Plan
-
-```bash
-# Create test extension 100 via web interface or CLI
-asterisk -rx "sip show peers"
-
-# Test voicemail
-asterisk -rx "voicemail show users"
-
-# Check call logs
-sudo tail -f /var/log/asterisk/messages
-```
-
----
-
-## Maintenance and Updates
-
-### Regular Maintenance Schedule
-
-| Task | Frequency | Command |
-|------|-----------|---------|
-| Check disk space | Daily | `df -h` |
-| Review logs | Daily | `tail -f /var/log/asterisk/messages` |
-| Backup database | Weekly | See backup section |
-| Update system | Monthly | See updates section |
-| Test restore | Monthly | See backup section |
-
-### System Backup
-
-#### Automated Backup via Web Interface
-
-1. Log in to FreePBX
-2. Navigate to **Admin → System Admin → Backup & Restore**
-3. Click **Add Backup Schedule**
-4. Configure:
-   - Frequency (Daily recommended)
-   - Time (Off-peak hours)
-   - Backup location
-5. Click **Save**
-
-#### Manual Backup
-
-```bash
-# Create backup directory
-sudo mkdir -p /backups/freepbx
-
-# Backup FreePBX database
-sudo mysqldump -u freepbxuser -p freepbx > /backups/freepbx/freepbx_$(date +%Y%m%d_%H%M%S).sql
-
-# Backup configuration files
-sudo tar -czf /backups/freepbx/asterisk_config_$(date +%Y%m%d_%H%M%S).tar.gz /etc/asterisk/
-
-# Backup voicemail and recordings
-sudo tar -czf /backups/freepbx/voicemail_$(date +%Y%m%d_%H%M%S).tar.gz /var/spool/asterisk/voicemail/
-```
-
-### System Updates
-
-#### Update Raspberry Pi OS
-
-```bash
-# Update package lists
-sudo apt update
-
-# Upgrade packages
-sudo apt upgrade -y
-
-# Clean cache
-sudo apt autoclean
-sudo apt autoremove
-```
-
-#### Update FreePBX
-
-```bash
-# Check for FreePBX updates
-fwconsole ma list | grep -i update
-
-# Update framework first
-fwconsole ma download framework
-fwconsole ma install framework
-
-# Update all other modules
-fwconsole ma downloadall
-fwconsole ma installall
-
-# Apply changes and reload
-fwconsole reload
-```
-
-#### Update Asterisk
-
-```bash
-# Check current Asterisk version
-asterisk -v
-
-# Update Asterisk (if available)
-sudo apt update
-sudo apt upgrade asterisk
-
-# Restart Asterisk after update
-sudo systemctl restart asterisk
-```
-
-### Service Restart Procedures
-
-```bash
-# Restart all services (safe method)
-sudo systemctl restart asterisk
-sudo systemctl restart mariadb
-sudo systemctl restart apache2
-
-# Restart single service
-sudo systemctl restart asterisk  # or mariadb, apache2
-
-# Check service status
-sudo systemctl status asterisk   # or mariadb, apache2
-
-# Enable services on boot
-sudo systemctl enable asterisk mariadb apache2
-```
-
----
-
-## Common Issues and Solutions
-
-### Issue 1: Web Interface Not Accessible
-
-**Symptoms:** Cannot reach `http://<raspberry-pi-ip>`
-
-**Solutions:**
-
-```bash
-# Check Apache is running
-sudo systemctl status apache2
-
-# Start Apache if stopped
-sudo systemctl start apache2
-
-# Check Apache error log
-sudo tail -f /var/log/apache2/error.log
-
-# Verify Apache is listening on port 80
-sudo netstat -tlnp | grep apache
-
-# Restart Apache
-sudo systemctl restart apache2
-```
-
-### Issue 2: Asterisk Not Starting
-
-**Symptoms:** Asterisk service fails to start or crashes
-
-**Solutions:**
-
-```bash
-# Check Asterisk status
-sudo systemctl status asterisk
-
-# View Asterisk logs
-sudo tail -f /var/log/asterisk/messages
-
-# Validate Asterisk configuration
-sudo asterisk -nvc
-
-# Check for configuration errors
-sudo asterisk -g
-
-# Restart Asterisk
-sudo systemctl restart asterisk
-
-# Check system resources
-free -h
-df -h
-```
-
-### Issue 3: No Audio in Calls
-
-**Symptoms:** Calls connect but no audio
-
-**Solutions:**
-
-```bash
-# Check RTP ports are open
-sudo ufw allow 10000:20000/udp
-
-# Verify SIP configuration
-asterisk -rx "sip show peers"
-
-# Check for NAT/firewall issues
-asterisk -rx "core show settings"
-
-# Restart Asterisk
-sudo systemctl restart asterisk
-
-# Check audio codecs
-asterisk -rx "core show codecs"
-```
-
-### Issue 4: Database Connection Errors
-
-**Symptoms:** FreePBX shows database error messages
-
-**Solutions:**
-
-```bash
-# Check MariaDB is running
-sudo systemctl status mariadb
-
-# Start MariaDB if stopped
-sudo systemctl start mariadb
-
-# Check database connectivity
-mysql -u freepbxuser -p -e "SELECT 1;"
-
-# Check MariaDB logs
-sudo tail -f /var/log/mysql/error.log
-
-# Restart MariaDB
-sudo systemctl restart mariadb
-```
-
-### Issue 5: High CPU Usage
-
-**Symptoms:** Raspberry Pi running slowly, high CPU usage
-
-**Solutions:**
-
-```bash
-# Check CPU usage
-top -b -n 1
-
-# Check process consuming CPU
-ps aux | sort -nrk 3,3 | head -n 10
-
-# Check memory usage
-free -h
-
-# Stop unnecessary services
-sudo systemctl stop bluetooth
-
-# Check running processes
+# Verify it's running as asterisk user
 ps aux | grep asterisk
 ```
 
-### Issue 6: Permission Denied Errors
+---
 
-**Symptoms:** Errors accessing files or directories
+## QuickProvisioner Module Installation
 
-**Solutions:**
+### Step 1: Clone the Repository
+
+Navigate to the FreePBX modules directory:
 
 ```bash
-# Check file permissions
-ls -la /var/www/html/
-ls -la /etc/asterisk/
-
-# Fix FreePBX permissions
-sudo chown -R asterisk:asterisk /var/www/html
-sudo chmod -R 755 /var/www/html
-
-# Fix Asterisk permissions
-sudo chown -R asterisk:asterisk /etc/asterisk
-sudo chmod -R 755 /etc/asterisk
-
-# Restart services
-sudo systemctl restart asterisk apache2
+cd /opt/freepbx/var/www/html/admin/modules
 ```
 
-### Issue 7: Modules Not Showing as Enabled
-
-**Symptoms:** Modules installed but not active
-
-**Solutions:**
+Clone the QuickProvisioner module using SSH:
 
 ```bash
-# List module status
-fwconsole ma list
+git clone git@github.com:Ezra90/freepbx-quickprovisioner.git quickprovisioner
+```
 
-# Enable specific module
-fwconsole ma enable arimanager
+Or using HTTPS (if SSH is not configured):
 
-# Enable all modules
-fwconsole ma enableall
+```bash
+git clone https://github.com/Ezra90/freepbx-quickprovisioner.git quickprovisioner
+```
+
+### Step 2: Set Directory Permissions
+
+```bash
+# Set ownership to asterisk user
+chown -R asterisk:asterisk /opt/freepbx/var/www/html/admin/modules/quickprovisioner
+
+# Set appropriate permissions
+chmod -R 755 /opt/freepbx/var/www/html/admin/modules/quickprovisioner
+chmod -R 644 /opt/freepbx/var/www/html/admin/modules/quickprovisioner/*.php
+chmod -R 755 /opt/freepbx/var/www/html/admin/modules/quickprovisioner/bin
+```
+
+### Step 3: Enable the QuickProvisioner Module
+
+```bash
+cd /opt/freepbx
+fwconsole ma enable quickprovisioner
+fwconsole reload
+```
+
+### Step 4: Verify Installation
+
+```bash
+# Check if module is listed and enabled
+fwconsole ma list | grep quickprovisioner
+
+# Access the FreePBX web interface
+# Navigate to http://<your-raspbx-ip>
+# Admin > Modules > Scroll to QuickProvisioner
+# Should see it listed and enabled
+```
+
+### Step 5: Configure QuickProvisioner (Optional)
+
+Access the configuration through the FreePBX web interface:
+
+1. Open your browser and navigate to `http://<your-raspbx-ip>`
+2. Log in with your FreePBX admin credentials
+3. Navigate to **Admin** > **Modules** > **QuickProvisioner**
+4. Configure settings as needed for your deployment
+
+---
+
+## Post-Installation Configuration
+
+### Step 1: Secure MariaDB
+
+```bash
+mysql_secure_installation
+```
+
+Follow the prompts to:
+- Set root password
+- Remove anonymous users
+- Disable remote root login
+- Remove test databases
+
+### Step 2: Configure Apache for HTTPS (Recommended)
+
+```bash
+# Enable SSL module
+a2enmod ssl
+
+# Create self-signed certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/ssl/private/raspbx.key \
+    -out /etc/ssl/certs/raspbx.crt
+
+# Restart Apache
+systemctl restart apache2
+```
+
+### Step 3: Configure Firewall
+
+```bash
+# Install UFW if not already installed
+apt-get install -y ufw
+
+# Enable UFW
+ufw enable
+
+# Allow SSH
+ufw allow 22/tcp
+
+# Allow HTTP and HTTPS
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# Allow SIP (UDP)
+ufw allow 5060/udp
+ufw allow 5160/udp
+
+# Allow RTP (audio/video)
+ufw allow 10000:20000/udp
+
+# Allow IAX2
+ufw allow 4569/udp
+
+# Verify rules
+ufw status
+```
+
+### Step 4: Set Up Automated Backups
+
+```bash
+# Create a backup directory
+mkdir -p /var/backups/freepbx
+
+# Use FreePBX backup module via cron
+# Edit crontab
+crontab -e
+
+# Add daily backup at 2 AM
+0 2 * * * /opt/freepbx/bin/fwconsole backup --backup 2>&1 | logger
+```
+
+### Step 5: Enable Updates
+
+```bash
+# Configure automatic security updates
+apt-get install -y unattended-upgrades
+dpkg-reconfigure unattended-upgrades
+
+# Configure automatic FreePBX module updates
+# In FreePBX web interface: Admin > System Admin > Module Admin
+# Enable "Auto-enable Upgrades" if desired
+```
+
+---
+
+## Troubleshooting
+
+### SSH Connection Issues
+
+**Problem:** Cannot connect via SSH
+```bash
+# Check SSH service status
+systemctl status ssh
+
+# Restart SSH service
+systemctl restart ssh
+
+# Verify SSH is listening on port 22
+netstat -ln | grep :22
+```
+
+**Solution:** Ensure the Raspberry Pi has network connectivity and SSH is enabled.
+
+### GitHub SSH Key Issues
+
+**Problem:** "Permission denied (publickey)" when cloning
+```bash
+# Verify SSH key exists
+ls -la ~/.ssh/
+
+# Test SSH connection
+ssh -vvv git@github.com
+
+# Add SSH key to agent if needed
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_rsa
+```
+
+**Solution:** Ensure your public key is added to GitHub and the private key has correct permissions (600).
+
+### Module Installation Issues
+
+**Problem:** Module fails to install
+```bash
+# Check FreePBX logs
+tail -f /var/log/asterisk/freepbx_engine.log
+
+# Verify module directory permissions
+ls -la /opt/freepbx/var/www/html/admin/modules/quickprovisioner
 
 # Reload FreePBX
 fwconsole reload
 
-# Restart services
-sudo systemctl restart asterisk apache2
+# Check for syntax errors
+php -l /opt/freepbx/var/www/html/admin/modules/quickprovisioner/quickprovisioner.php
 ```
+
+**Solution:** Ensure proper directory permissions and ownership by asterisk user.
+
+### Asterisk Service Issues
+
+**Problem:** Asterisk service fails to start
+```bash
+# Check service status
+systemctl status asterisk
+
+# View detailed error log
+journalctl -u asterisk -n 50
+
+# Check Asterisk configuration
+asterisk -nvc
+
+# Verify ownership and permissions
+ls -la /etc/asterisk
+ls -la /var/lib/asterisk
+```
+
+**Solution:** Ensure all configuration files and directories have correct ownership and permissions.
+
+### Database Connection Issues
+
+**Problem:** FreePBX cannot connect to database
+```bash
+# Check MariaDB status
+systemctl status mariadb
+
+# Test database connection
+mysql -u root -p -e "show databases;"
+
+# Verify FreePBX database
+mysql -u root -p -e "use asterisk; show tables;"
+```
+
+**Solution:** Ensure MariaDB is running and the asterisk database exists and is properly configured.
+
+### Web Interface Access Issues
+
+**Problem:** Cannot access FreePBX web interface
+```bash
+# Check Apache status
+systemctl status apache2
+
+# Verify Apache is listening
+netstat -ln | grep :80
+
+# Check Apache error logs
+tail -f /var/log/apache2/error.log
+
+# Verify PHP is working
+php -v
+```
+
+**Solution:** Ensure Apache is running, PHP is installed, and firewall allows HTTP/HTTPS traffic.
 
 ---
-
-## Support and Troubleshooting
-
-### Log Files Location
-
-| Service | Log File | Command |
-|---------|----------|---------|
-| Asterisk | `/var/log/asterisk/messages` | `tail -f /var/log/asterisk/messages` |
-| Apache2 | `/var/log/apache2/error.log` | `tail -f /var/log/apache2/error.log` |
-| MariaDB | `/var/log/mysql/error.log` | `tail -f /var/log/mysql/error.log` |
-| System | `/var/log/syslog` | `tail -f /var/log/syslog` |
-| FreePBX | `/var/log/asterisk/freepbx_engine.log` | `tail -f /var/log/asterisk/freepbx_engine.log` |
-
-### Useful Diagnostic Commands
-
-```bash
-# System information
-uname -a
-cat /proc/meminfo
-df -h
-
-# Network information
-ip addr show
-netstat -tulpn
-
-# Asterisk diagnostics
-asterisk -rx "core show version"
-asterisk -rx "core show uptime"
-asterisk -rx "sip show peers"
-asterisk -rx "sip show channels"
-
-# FreePBX diagnostics
-fwconsole dbug on
-fwconsole dbug off
-fwconsole reload
-```
-
-### Getting Help
-
-1. **Check Logs First:** Always review relevant log files for error messages
-2. **Verify Services:** Ensure all services are running (`systemctl status asterisk`)
-3. **Check Permissions:** Verify file and directory permissions are correct
-4. **Test Connectivity:** Confirm network connectivity and firewall rules
-5. **Review Configuration:** Check Asterisk and FreePBX configurations for syntax errors
-
-### Issue Reporting
-
-When reporting issues, include:
-- Asterisk version: `asterisk -v`
-- FreePBX version: Web interface bottom right
-- Raspberry Pi model and OS version: `uname -a`
-- Relevant log excerpts (last 50 lines)
-- Steps to reproduce the issue
-- Expected vs. actual behavior
-
----
-
-## Security Recommendations
-
-### Strong Access Control
-
-#### Change Default Credentials
-
-```bash
-# Change admin password immediately after installation
-# Via web interface: Admin → System Admin → Credentials
-
-# Change MySQL password
-mysql -u freepbxuser -p
-# At MySQL prompt:
-# ALTER USER 'freepbxuser'@'localhost' IDENTIFIED BY 'new_strong_password';
-# FLUSH PRIVILEGES;
-# EXIT;
-```
-
-#### Set Up Additional Admin Accounts
-
-1. Log in as admin
-2. Navigate to **Admin → System Admin → Users**
-3. Click **Add New User**
-4. Configure user with appropriate permissions
-5. Assign strong password
-
-### Firewall Configuration
-
-```bash
-# Enable UFW firewall
-sudo ufw enable
-
-# Allow essential ports only
-sudo ufw allow ssh
-sudo ufw allow 80/tcp      # HTTP
-sudo ufw allow 443/tcp     # HTTPS
-sudo ufw allow 5060/tcp    # SIP TCP
-sudo ufw allow 5060/udp    # SIP UDP
-sudo ufw allow 10000:20000/udp # RTP
-
-# Check firewall status
-sudo ufw status
-
-# Disable access to dangerous ports
-sudo ufw deny 22          # SSH - if not needed
-sudo ufw deny 3306        # MySQL - allow only local
-```
-
-### Network Segmentation
-
-1. **Internal Network:** Keep Raspberry Pi on internal network if possible
-2. **VPN Access:** Use VPN for remote administration
-3. **SSH Keys:** Use SSH key authentication instead of passwords
-4. **Restrict Access:** Limit FreePBX access to trusted IP addresses
-
-### Regular Security Updates
-
-```bash
-# Enable automatic security updates
-sudo apt install -y unattended-upgrades
-
-# Configure automatic updates
-sudo dpkg-reconfigure -plow unattended-upgrades
-
-# Check for available updates
-sudo apt update
-apt list --upgradable
-```
-
-### Database Security
-
-```bash
-# Limit MySQL to localhost only
-sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
-# Find: bind-address = 127.0.0.1
-# Ensure it's set to localhost only
-
-# Remove MySQL test database
-mysql -u root -p
-# DROP DATABASE test;
-# DELETE FROM mysql.user WHERE user='test';
-# FLUSH PRIVILEGES;
-```
-
-### Asterisk SIP Security
-
-1. Log in to FreePBX web interface
-2. Navigate to **Settings → SIP Settings**
-3. Configure:
-   - **Require REGISTER:** Yes
-   - **Require Certificate Validation:** Yes
-   - **SIP TLS:** Enable if supported by devices
-   - **SRTP:** Enable for sensitive calls
-4. Apply changes
-
-### Regular Backups
-
-```bash
-# Create weekly backup
-0 2 * * 0 /usr/bin/mysqldump -u freepbxuser -p'password' freepbx > /backups/freepbx_$(date +\%Y\%m\%d).sql
-
-# Backup to external storage
-rsync -av /backups/ /mnt/external_backup/
-
-# Verify backup integrity
-gzip -t /backups/freepbx_*.sql.gz
-```
-
-### Monitoring and Alerts
-
-1. Set up log rotation for large log files
-2. Monitor disk space regularly
-3. Monitor system resources (CPU, memory)
-4. Review Asterisk logs daily for errors
-5. Test disaster recovery procedures monthly
-
-### Disable Unnecessary Services
-
-```bash
-# Disable Bluetooth if not needed
-sudo systemctl disable bluetooth
-sudo systemctl stop bluetooth
-
-# Disable SSH if only local access needed (advanced users only)
-# sudo systemctl disable ssh
-# sudo systemctl stop ssh
-
-# Check running services
-sudo systemctl list-units --type=service --state=running
-```
-
-### Documentation
-
-Maintain documentation of:
-- All user accounts and their purposes
-- All extensions and their configurations
-- Backup procedures and recovery steps
-- Security policies and access restrictions
-- Change log for all modifications
-- Contact information for support
-
----
-
-## System Requirements Summary
-
-| Component | Specification |
-|-----------|---------------|
-| **Asterisk Version** | 22.x (latest) |
-| **PHP Version** | 8.2+ |
-| **MariaDB Version** | 10.5+ |
-| **Apache2 Version** | 2.4+ |
-| **Raspberry Pi Model** | 3B+, 4B, 5 recommended |
-| **RAM Minimum** | 1GB (2GB recommended) |
-| **Storage Minimum** | 16GB microSD (32GB recommended) |
-| **Network** | Ethernet or WiFi |
-| **Power Supply** | 5V/3A minimum |
-
-## Running Services
-
-After successful installation, these services should be running:
-
-```bash
-# Check all services
-sudo systemctl status asterisk mariadb apache2
-
-# Expected output:
-# ● asterisk.service - Asterisk PBX
-# ● mariadb.service - MariaDB database server
-# ● apache2.service - Apache HTTP Server
-```
 
 ## Additional Resources
 
-- [FreePBX Official Documentation](https://wiki.freepbx.org/)
-- [Asterisk Project](https://www.asterisk.org/)
-- [RasPBX Project](https://www.raspbx.org/)
-- [Raspberry Pi Documentation](https://www.raspberrypi.org/documentation/)
-- [GitHub Repository](https://github.com/Ezra90/freepbx-quickprovisioner)
+- [Raspberry Pi Documentation](https://www.raspberrypi.com/documentation/)
+- [RasPBX Project](http://www.raspbx.org/)
+- [FreePBX Documentation](https://docs.freepbx.org/)
+- [Asterisk Documentation](https://wiki.asterisk.org/)
+- [GitHub SSH Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-01-02 04:11:06 UTC  
-**Author:** FreePBX QuickProvisioner Team  
-**License:** GNU General Public License v3.0
+## Support and Issues
+
+For issues specific to QuickProvisioner, please visit:
+- [QuickProvisioner GitHub Repository](https://github.com/Ezra90/freepbx-quickprovisioner)
+- Create an issue with detailed logs and error messages
+
+For general RasPBX support:
+- [RasPBX Forums](http://www.raspbx.org/)
+- [Asterisk Community](https://community.asterisk.org/)
+
+---
+
+**Last Updated:** 2026-01-02
+**Document Version:** 1.0
