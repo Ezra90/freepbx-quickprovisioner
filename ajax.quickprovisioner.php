@@ -112,7 +112,8 @@ switch ($action) {
         $ext = $device['extension'];
         $userInfo = \FreePBX::Core()->getUser($ext);
         $display_name = $userInfo['name'] ?? $ext;
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+        $deviceInfo = \FreePBX::Core()->getDevice($ext);
+        $secret = isset($deviceInfo['secret']) ? $deviceInfo['secret'] : '';
         $server_ip = $_SERVER['SERVER_ADDR'];
         $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
         $wpUrl = "";
@@ -322,7 +323,8 @@ switch ($action) {
     case 'get_sip_secret':
         $ext = $_REQUEST['extension'] ?? null;
         if (!$ext) { $response['message'] = 'No extension'; break; }
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+        $deviceInfo = \FreePBX::Core()->getDevice($ext);
+        $secret = isset($deviceInfo['secret']) ? $deviceInfo['secret'] : '';
         if ($secret) {
             $response = ['status' => true, 'secret' => $secret];
         } else {
