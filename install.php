@@ -62,7 +62,7 @@ function setPermissionsSafely($path, $is_dir = false, $logger = null) {
     if (function_exists('posix_getpwnam')) {
         $asterisk_user = @posix_getpwnam('asterisk');
         if ($asterisk_user) {
-            if (!@chown($path, $asterisk_user['uid']) || !@chgrp($path, $asterisk_user['gid'])) {
+            if (!(@chown($path, $asterisk_user['uid']) && @chgrp($path, $asterisk_user['gid']))) {
                 if ($logger) $logger->log("Could not set ownership for: $path (this may be OK if already correct)", 'DEBUG');
             }
         }
@@ -73,16 +73,19 @@ function setPermissionsSafely($path, $is_dir = false, $logger = null) {
 
 // Create directories with proper permissions early
 if (!is_dir($assets_dir))    { 
-    mkdir($assets_dir, 0775, true);
-    setPermissionsSafely($assets_dir, true, $logger);
+    if (mkdir($assets_dir, 0775, true)) {
+        setPermissionsSafely($assets_dir, true, $logger);
+    }
 }
 if (!is_dir($uploads_dir))   { 
-    mkdir($uploads_dir, 0775, true);
-    setPermissionsSafely($uploads_dir, true, $logger);
+    if (mkdir($uploads_dir, 0775, true)) {
+        setPermissionsSafely($uploads_dir, true, $logger);
+    }
 }
 if (!is_dir($templates_dir)) { 
-    mkdir($templates_dir, 0775, true);
-    setPermissionsSafely($templates_dir, true, $logger);
+    if (mkdir($templates_dir, 0775, true)) {
+        setPermissionsSafely($templates_dir, true, $logger);
+    }
 }
 
 // Create .htaccess files using PHP file operations
