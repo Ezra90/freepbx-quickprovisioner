@@ -977,8 +977,12 @@ stat /var/www/html/admin/modules/quickprovisioner/module.xml
 
 4. **Recreate tables if needed**:
    ```bash
-   # If install.sql exists
-   mysql -u root -p freepbx < /var/www/html/admin/modules/quickprovisioner/install.sql
+   # Check if install.sql exists first
+   if [ -f /var/www/html/admin/modules/quickprovisioner/install.sql ]; then
+       mysql -u root -p freepbx < /var/www/html/admin/modules/quickprovisioner/install.sql
+   else
+       echo "install.sql not found - module may not require database tables"
+   fi
    ```
 
 ### 10.10 Getting Help
@@ -1098,10 +1102,10 @@ git status
 ## Document Information
 
 - **Version**: 1.0.0
-- **Last Updated**: 2026-01-02
+- **Last Updated**: January 2024
 - **Author**: Repository Documentation
 - **Tested On**: RasPBX (latest), FreePBX 13.0+
-- **Module Version**: Quick Provisioner v2.1.0
+- **Module Version**: Quick Provisioner v2.1.0 (check module.xml for current version)
 
 ---
 
