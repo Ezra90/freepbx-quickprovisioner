@@ -1,0 +1,416 @@
+{
+    "manufacturer": "Yealink",
+    "model": "T48G",
+    "display_name": "Yealink T48G",
+    "max_line_keys": 29,
+    "button_layout": "grid",
+    "svg_fallback": true,
+    "notes": "Wallpaper: 800x480 JPG/PNG recommended. Touch screen model.",
+    "options": {
+        "provisioning_server": "http://yourserver/qp"
+    },
+    "configurable_options": [
+        {
+            "name": "phone_setting.keyboard_lock",
+            "type": "bool",
+            "default": 1,
+            "label": "Enable Phone Lock",
+            "description": "Enable the phone lock feature"
+        },
+        {
+            "name": "phone_setting.keyboard_lock.type",
+            "type": "select",
+            "default": 1,
+            "label": "Lock Type",
+            "description": "Set lock type: 0-Lock all keys; 1-Lock all except dial pad",
+            "options": {
+                "0": "Lock all keys",
+                "1": "Lock all except dial pad"
+            }
+        },
+        {
+            "name": "phone_setting.keyboard_lock.password",
+            "type": "text",
+            "default": "1234",
+            "label": "Unlock PIN",
+            "description": "Define the unlock PIN (up to 15 characters)"
+        },
+        {
+            "name": "phone_setting.keyboard_lock.timeout",
+            "type": "number",
+            "default": 60,
+            "label": "Auto-Lock Timeout",
+            "description": "Idle time before auto-locking (in seconds)",
+            "min": 0,
+            "max": 3600
+        },
+        {
+            "name": "features.enhanced_dss_keys.enable",
+            "type": "bool",
+            "default": 1,
+            "label": "Enable Enhanced DSS Keys",
+            "description": ""
+        },
+        {
+            "name": "softkey.1.enable",
+            "type": "bool",
+            "default": 0,
+            "label": "Enable Menu Softkey",
+            "description": "Hide the \"Menu\" softkey entirely to prevent tampering"
+        },
+        {
+            "name": "softkey.1.label",
+            "type": "text",
+            "default": "Menu",
+            "label": "Menu Softkey Label",
+            "description": ""
+        },
+        {
+            "name": "static.security.admin_password",
+            "type": "text",
+            "default": "NewAdminPass2026",
+            "label": "Admin Password",
+            "description": "Change default admin password for web/phone interface"
+        },
+        {
+            "name": "static.network.web_server.enable",
+            "type": "bool",
+            "default": 0,
+            "label": "Enable Web Interface",
+            "description": "Disable the web interface for total lockdown (requires factory reset to re-enable)"
+        },
+        {
+            "name": "static.zero_touch.enable",
+            "type": "bool",
+            "default": 0,
+            "label": "Enable Zero Touch",
+            "description": "Disable Zero Touch (prevents kids from accidentally triggering provisioning at boot)"
+        },
+        {
+            "name": "phone_setting.backgrounds",
+            "type": "text",
+            "default": "192.168.1.50",
+            "label": "Custom Wallpaper URL",
+            "description": "Set a custom wallpaper (URL must be accessible by the phone)"
+        },
+        {
+            "name": "screensaver.enable",
+            "type": "bool",
+            "default": 1,
+            "label": "Enable Screensaver",
+            "description": "Enable and configure a screensaver"
+        },
+        {
+            "name": "screensaver.wait_time",
+            "type": "number",
+            "default": 300,
+            "label": "Screensaver Wait Time",
+            "description": "",
+            "min": 0,
+            "max": 3600
+        },
+        {
+            "name": "screensaver.type",
+            "type": "number",
+            "default": 1,
+            "label": "Screensaver Type",
+            "description": ""
+        },
+        {
+            "name": "screensaver.upload_url",
+            "type": "text",
+            "default": "192.168.1.50",
+            "label": "Screensaver Upload URL",
+            "description": ""
+        },
+        {
+            "name": "account.1.display_name",
+            "type": "text",
+            "default": "Home Office",
+            "label": "Display Name",
+            "description": "Set the phone's display name (appears on screen)"
+        },
+        {
+            "name": "account.1.hotline_number",
+            "type": "text",
+            "default": "[PhoneNumber]",
+            "label": "Hotline Number",
+            "description": "Enable Hotline / Hot Dialing for Account 1"
+        },
+        {
+            "name": "account.1.hotline_delay",
+            "type": "number",
+            "default": 0,
+            "label": "Hotline Delay",
+            "description": "Delay before dialing (0 = immediate, 4 = wait 4 seconds)",
+            "min": 0,
+            "max": 10
+        },
+        {
+            "name": "phone_setting.inter_digit_timer",
+            "type": "number",
+            "default": 2,
+            "label": "Inter Digit Timer",
+            "description": "Reduce wait time after last digit is pressed before dialing automatically",
+            "min": 1,
+            "max": 10
+        }
+    ],
+    "visual_editor": {
+        "screen_width": 800,
+        "screen_height": 480,
+        "remote_image_url": "https://www.yealink.com/website-service/attachment/product/image/20220505/20220505081634628a8fbe2554cb0a0fe603f82981fdd.png",
+        "schematic": {
+            "chassis_width": 800,
+            "chassis_height": 600,
+            "screen_x": 100,
+            "screen_y": 50,
+            "screen_width": 600,
+            "screen_height": 360
+        },
+        "keys": [
+            {
+                "index": 1,
+                "x": 50,
+                "y": 100,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 2,
+                "x": 250,
+                "y": 100,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 3,
+                "x": 450,
+                "y": 100,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 4,
+                "x": 50,
+                "y": 180,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 5,
+                "x": 250,
+                "y": 180,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 6,
+                "x": 450,
+                "y": 180,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 7,
+                "x": 50,
+                "y": 260,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 8,
+                "x": 250,
+                "y": 260,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 9,
+                "x": 450,
+                "y": 260,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 10,
+                "x": 50,
+                "y": 340,
+                "label_align": "center",
+                "page": 1,
+                "info": "Grid key"
+            },
+            {
+                "index": 11,
+                "x": 50,
+                "y": 100,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 12,
+                "x": 250,
+                "y": 100,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 13,
+                "x": 450,
+                "y": 100,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 14,
+                "x": 50,
+                "y": 180,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 15,
+                "x": 250,
+                "y": 180,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 16,
+                "x": 450,
+                "y": 180,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 17,
+                "x": 50,
+                "y": 260,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 18,
+                "x": 250,
+                "y": 260,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 19,
+                "x": 450,
+                "y": 260,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 20,
+                "x": 50,
+                "y": 340,
+                "label_align": "center",
+                "page": 2,
+                "info": "Grid key"
+            },
+            {
+                "index": 21,
+                "x": 50,
+                "y": 100,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 22,
+                "x": 250,
+                "y": 100,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 23,
+                "x": 450,
+                "y": 100,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 24,
+                "x": 50,
+                "y": 180,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 25,
+                "x": 250,
+                "y": 180,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 26,
+                "x": 450,
+                "y": 180,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 27,
+                "x": 50,
+                "y": 260,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 28,
+                "x": 250,
+                "y": 260,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            },
+            {
+                "index": 29,
+                "x": 450,
+                "y": 260,
+                "label_align": "center",
+                "page": 3,
+                "info": "Grid key"
+            }
+        ]
+    },
+    "provisioning": {
+        "content_type": "text/plain",
+        "filename_pattern": "{mac}.cfg",
+        "type_mapping": {
+            "line": "15",
+            "speed_dial": "13",
+            "blf": "16"
+        },
+        "template": "#!version:1.0.0.1\naccount.1.enable = 1\naccount.1.label = {{display_name}}\naccount.1.display_name = {{display_name}}\naccount.1.auth_name = {{extension}}\naccount.1.user_name = {{extension}}\naccount.1.password = {{password}}\naccount.1.sip_server.1.address = {{server_host}}\naccount.1.sip_server.1.port = {{server_port}}\nphone_setting.backgrounds = {{wallpaper}}\n{{line_keys_loop}}\nlinekey.{{index}}.type = {{type}}\nlinekey.{{index}}.value = {{value}}\nlinekey.{{index}}.label = {{label}}\n{{/line_keys_loop}}\n{{contacts_loop}}\nremote_phonebook.data.1.url = {{contacts_url_example}}\n{{/contacts_loop}}\n# Enable the phone lock feature\n{{if phone_setting.keyboard_lock}}phone_setting.keyboard_lock = {{phone_setting.keyboard_lock}}\n{{/if}}\n# Set lock type: 0-Lock all keys; 1-Lock all except dial pad\n{{if phone_setting.keyboard_lock.type}}phone_setting.keyboard_lock.type = {{phone_setting.keyboard_lock.type}}\n{{/if}}\n# Define the unlock PIN (up to 15 characters)\n{{if phone_setting.keyboard_lock.password}}phone_setting.keyboard_lock.password = {{phone_setting.keyboard_lock.password}}\n{{/if}}\n# Idle time before auto-locking (in seconds)\n{{if phone_setting.keyboard_lock.timeout}}phone_setting.keyboard_lock.timeout = {{phone_setting.keyboard_lock.timeout}}\n{{/if}}\n# Hide the \"Menu\" softkey entirely to prevent tampering\n{{if features.enhanced_dss_keys.enable}}features.enhanced_dss_keys.enable = {{features.enhanced_dss_keys.enable}}\n{{/if}}\n{{if softkey.1.enable}}softkey.1.enable = {{softkey.1.enable}}\n{{/if}}\n{{if softkey.1.label}}softkey.1.label = {{softkey.1.label}}\n{{/if}}\n# Change default admin password for web/phone interface\n{{if static.security.admin_password}}static.security.admin_password = {{static.security.admin_password}}\n{{/if}}\n# Disable the web interface for total lockdown (requires factory reset to re-enable)\n{{if static.network.web_server.enable}}static.network.web_server.enable = {{static.network.web_server.enable}}\n{{/if}}\n# Disable Zero Touch (prevents kids from accidentally triggering provisioning at boot)\n{{if static.zero_touch.enable}}static.zero_touch.enable = {{static.zero_touch.enable}}\n{{/if}}\n# Set a custom wallpaper (URL must be accessible by the phone)\n{{if phone_setting.backgrounds}}phone_setting.backgrounds = {{phone_setting.backgrounds}}\n{{/if}}\n# Enable and configure a screensaver\n{{if screensaver.enable}}screensaver.enable = {{screensaver.enable}}\n{{/if}}\n{{if screensaver.wait_time}}screensaver.wait_time = {{screensaver.wait_time}}\n{{/if}}\n{{if screensaver.type}}screensaver.type = {{screensaver.type}}\n{{/if}}\n{{if screensaver.upload_url}}screensaver.upload_url = {{screensaver.upload_url}}\n{{/if}}\n# Set the phone's display name (appears on screen)\n{{if account.1.display_name}}account.1.display_name = {{account.1.display_name}}\n{{/if}}\n# Enable Hotline / Hot Dialing for Account 1\n{{if account.1.hotline_number}}account.1.hotline_number = {{account.1.hotline_number}}\n{{/if}}\n{{if account.1.hotline_delay}}account.1.hotline_delay = {{account.1.hotline_delay}}\n{{/if}}\n# Reduce wait time after last digit is pressed before dialing automatically\n{{if phone_setting.inter_digit_timer}}phone_setting.inter_digit_timer = {{phone_setting.inter_digit_timer}}\n{{/if}}"
+    }
+}

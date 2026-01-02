@@ -1,0 +1,21 @@
+<module>
+    <rawname>quickprovisioner</rawname>
+    <name>HH Quick Provisioner</name>
+    <version>2.1.0</version>
+    <publisher>HH</publisher>
+    <license>GPLv3</license>
+    <type>tool</type>
+    <category>Applications</category>
+    <description>
+        Enterprise Provisioning Tool v2.1.0. Features: Visual Key Editor with Paging, Protected Asset Manager, File-based Handset Model Templates with Import/Download/Delete, Kid Mode PIN, Wallpaper Resizing, Schematic Previews, Contact Management, Dynamic Provisioning with Custom Overrides.
+    </description>
+    <menuitems>
+        <quickprovisioner>HH Quick Provisioner</quickprovisioner>
+    </menuitems>
+    <depends>
+        <version>13.0</version>
+    </depends>
+    <supported>
+        <version>16.0</version>
+    </supported>
+</module>
