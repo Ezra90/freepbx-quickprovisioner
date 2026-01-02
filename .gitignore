@@ -4,6 +4,13 @@ composer.lock
 .php_cs.cache
 .phpunit.result.cache
 
+# QuickProvisioner User Uploads and Generated Files
+assets/uploads/*
+!assets/uploads/.gitkeep
+assets/*
+!assets/.gitkeep
+templates/*.json
+
 # IDE and Editor Files
 .vscode/
 .idea/

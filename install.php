@@ -40,36 +40,72 @@ $assets_dir     = __DIR__ . '/assets';
 $uploads_dir    = $assets_dir . '/uploads';
 $templates_dir  = __DIR__ . '/templates';
 
+// Helper function to safely set file/directory permissions and ownership
+function setPermissionsSafely($path, $is_dir = false, $logger = null) {
+    $success = true;
+    
+    // Try to set permissions using PHP
+    if ($is_dir) {
+        if (!@chmod($path, 0775)) {
+            if ($logger) $logger->log("Could not set permissions for directory: $path", 'WARNING');
+            $success = false;
+        }
+    } else {
+        if (!@chmod($path, 0664)) {
+            if ($logger) $logger->log("Could not set permissions for file: $path", 'WARNING');
+            $success = false;
+        }
+    }
+    
+    // Try to set ownership (may require elevated privileges)
+    // Use posix functions if available, otherwise skip with warning
+    if (function_exists('posix_getpwnam')) {
+        $asterisk_user = @posix_getpwnam('asterisk');
+        if ($asterisk_user) {
+            if (!@chown($path, $asterisk_user['uid']) || !@chgrp($path, $asterisk_user['gid'])) {
+                if ($logger) $logger->log("Could not set ownership for: $path (this may be OK if already correct)", 'DEBUG');
+            }
+        }
+    }
+    
+    return $success;
+}
+
 // Create directories with proper permissions early
-if (!is_dir($assets_dir))    { mkdir($assets_dir,    0777, true); }  // Temp 0777 for web write
-if (!is_dir($uploads_dir))   { mkdir($uploads_dir,   0777, true); }
-if (!is_dir($templates_dir)) { mkdir($templates_dir, 0777, true); }
+if (!is_dir($assets_dir))    { 
+    mkdir($assets_dir, 0775, true);
+    setPermissionsSafely($assets_dir, true, $logger);
+}
+if (!is_dir($uploads_dir))   { 
+    mkdir($uploads_dir, 0775, true);
+    setPermissionsSafely($uploads_dir, true, $logger);
+}
+if (!is_dir($templates_dir)) { 
+    mkdir($templates_dir, 0775, true);
+    setPermissionsSafely($templates_dir, true, $logger);
+}
 
-// Immediately fix ownership and permissions (run as root via sudo if needed; adjust for your distro)
-shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type d -exec chmod 775 {} \\;");
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type f -exec chmod 664 {} \\;");
-
-// Create .htaccess using temp file + mv (web-safe)
+// Create .htaccess files using PHP file operations
 $htaccess_content = "Deny from all";
-$temp_htaccess = tempnam(sys_get_temp_dir(), 'htaccess_');
-file_put_contents($temp_htaccess, $htaccess_content);
 
 $uploads_htaccess = $uploads_dir . '/.htaccess';
 if (!file_exists($uploads_htaccess)) {
-    shell_exec("sudo mv " . escapeshellarg($temp_htaccess) . " " . escapeshellarg($uploads_htaccess));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($uploads_htaccess));
-    $logger->log('Created uploads/.htaccess', 'INFO');
+    if (file_put_contents($uploads_htaccess, $htaccess_content) !== false) {
+        setPermissionsSafely($uploads_htaccess, false, $logger);
+        $logger->log('Created uploads/.htaccess', 'INFO');
+    } else {
+        $logger->log('Failed to create uploads/.htaccess', 'WARNING');
+    }
 }
-
-$temp_htaccess = tempnam(sys_get_temp_dir(), 'htaccess_');  // Recreate for templates
-file_put_contents($temp_htaccess, $htaccess_content);
 
 $templates_htaccess = $templates_dir . '/.htaccess';
 if (!file_exists($templates_htaccess)) {
-    shell_exec("sudo mv " . escapeshellarg($temp_htaccess) . " " . escapeshellarg($templates_htaccess));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($templates_htaccess));
-    $logger->log('Created templates/.htaccess', 'INFO');
+    if (file_put_contents($templates_htaccess, $htaccess_content) !== false) {
+        setPermissionsSafely($templates_htaccess, false, $logger);
+        $logger->log('Created templates/.htaccess', 'INFO');
+    } else {
+        $logger->log('Failed to create templates/.htaccess', 'WARNING');
+    }
 }
 
 // --- 3. Helper: Key Generation ---
@@ -129,7 +165,7 @@ function installProfile($data) {
     $model = $data['model'];
     $path = $templates_dir . '/' . $model . '.json';
 
-    // For remote image, use temp + mv
+    // For remote image, download and save
     if (!empty($data['visual_editor']['remote_image_url'])) {
         $url = $data['visual_editor']['remote_image_url'];
         $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
@@ -140,13 +176,13 @@ function installProfile($data) {
             $opts = ["http" => ["header" => "User-Agent: HHPro\r\n"], "ssl" => ["verify_peer" => false]];
             $img = @file_get_contents($url, false, stream_context_create($opts));
             if ($img) {
-                $temp_img = tempnam(sys_get_temp_dir(), 'img_');
-                file_put_contents($temp_img, $img);
-                shell_exec("sudo mv " . escapeshellarg($temp_img) . " " . escapeshellarg($localPath));
-                shell_exec("sudo chmod 0644 " . escapeshellarg($localPath));
-                shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($localPath));
-                $data['visual_editor']['background_image_url'] = 'assets/' . $localName;
-                $logger->log("Downloaded background for $model", 'INFO');
+                if (file_put_contents($localPath, $img) !== false) {
+                    setPermissionsSafely($localPath, false, $logger);
+                    $data['visual_editor']['background_image_url'] = 'assets/' . $localName;
+                    $logger->log("Downloaded background for $model", 'INFO');
+                } else {
+                    $logger->log("Failed to save background for $model", 'WARNING');
+                }
             } else {
                 $logger->log("Failed to download background for $model", 'WARNING');
             }
@@ -156,12 +192,12 @@ function installProfile($data) {
     }
 
     $json = json_encode($data);
-    $temp_json = tempnam(sys_get_temp_dir(), 'json_');
-    file_put_contents($temp_json, $json);
-    shell_exec("sudo mv " . escapeshellarg($temp_json) . " " . escapeshellarg($path));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($path));
-    shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($path));
-    $logger->log("Installed template: $model", 'INFO');
+    if (file_put_contents($path, $json) !== false) {
+        setPermissionsSafely($path, false, $logger);
+        $logger->log("Installed template: $model", 'INFO');
+    } else {
+        $logger->log("Failed to install template: $model", 'ERROR');
+    }
 }
 
 // --- 5. Default Profiles (only if templates folder is empty) ---
@@ -246,11 +282,6 @@ if (empty($existing_files)) {
         ]
     ]);
 }
-
-// Final permission sweep (in case anything was missed)
-shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type d -exec chmod 775 {} \\;");
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type f -exec chmod 664 {} \\;");
 
 if ($logger) {
     $logger->log('HH Quick Provisioner install completed', 'INFO');

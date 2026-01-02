@@ -26,22 +26,46 @@ FreePBX QuickProvisioner is an automation-focused solution that simplifies the p
 
 ## Installation
 
-1. **Download the module**:
+This module is deployed directly via git to the FreePBX modules directory. No `fwconsole` commands are needed.
+
+### Quick Start
+
+1. **Clone the module to the FreePBX modules directory**:
    ```bash
-   cd /usr/src/freepbx
-   git clone https://github.com/Ezra90/freepbx-quickprovisioner.git
-   cd freepbx-quickprovisioner
+   cd /var/www/html/admin/modules
+   sudo git clone https://github.com/Ezra90/freepbx-quickprovisioner.git quickprovisioner
    ```
 
-2. **Install the module**:
+2. **Set proper ownership and permissions**:
    ```bash
-   fwconsole ma install freepbx-quickprovisioner
+   sudo chown -R asterisk:asterisk /var/www/html/admin/modules/quickprovisioner
+   sudo find /var/www/html/admin/modules/quickprovisioner -type d -exec chmod 775 {} \;
+   sudo find /var/www/html/admin/modules/quickprovisioner -type f -exec chmod 664 {} \;
    ```
 
-3. **Enable the module**:
-   ```bash
-   fwconsole ma enable freepbx-quickprovisioner
-   ```
+3. **Initialize the module** by visiting the FreePBX admin interface:
+   - Navigate to **Admin** → **Modules** → **Check Online**
+   - The QuickProvisioner module should appear in the module list
+   - The database tables and directories will be created automatically on first access
+
+### Updating
+
+To update the module when changes are available:
+
+```bash
+cd /var/www/html/admin/modules/quickprovisioner
+sudo git pull
+sudo fwconsole reload
+```
+
+### For Complete Deployment Documentation
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed information about:
+- Directory permissions and ownership
+- Database initialization
+- Checking for changes with git
+- Troubleshooting common issues
+- Best practices for updates and maintenance
 
 ## Usage
 
