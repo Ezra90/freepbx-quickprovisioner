@@ -46,13 +46,25 @@ if (!is_dir($uploads_dir))   { mkdir($uploads_dir,   0775, true); }
 if (!is_dir($templates_dir)) { mkdir($templates_dir, 0775, true); }
 
 // Set ownership and permissions using PHP functions
-// Note: chown/chgrp may fail if not running as appropriate user, but that's acceptable
-@chown($assets_dir, 'asterisk');
-@chgrp($assets_dir, 'asterisk');
-@chown($uploads_dir, 'asterisk');
-@chgrp($uploads_dir, 'asterisk');
-@chown($templates_dir, 'asterisk');
-@chgrp($templates_dir, 'asterisk');
+// Note: chown/chgrp may fail if not running as appropriate user
+if (!@chown($assets_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chown assets directory (may require elevated privileges)', 'WARNING');
+}
+if (!@chgrp($assets_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chgrp assets directory (may require elevated privileges)', 'WARNING');
+}
+if (!@chown($uploads_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chown uploads directory (may require elevated privileges)', 'WARNING');
+}
+if (!@chgrp($uploads_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chgrp uploads directory (may require elevated privileges)', 'WARNING');
+}
+if (!@chown($templates_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chown templates directory (may require elevated privileges)', 'WARNING');
+}
+if (!@chgrp($templates_dir, 'asterisk')) {
+    $logger->log('Warning: Failed to chgrp templates directory (may require elevated privileges)', 'WARNING');
+}
 
 // Create .htaccess files
 $htaccess_content = "Deny from all";
@@ -61,8 +73,12 @@ $uploads_htaccess = $uploads_dir . '/.htaccess';
 if (!file_exists($uploads_htaccess)) {
     file_put_contents($uploads_htaccess, $htaccess_content);
     @chmod($uploads_htaccess, 0644);
-    @chown($uploads_htaccess, 'asterisk');
-    @chgrp($uploads_htaccess, 'asterisk');
+    if (!@chown($uploads_htaccess, 'asterisk')) {
+        $logger->log('Warning: Failed to chown uploads/.htaccess', 'WARNING');
+    }
+    if (!@chgrp($uploads_htaccess, 'asterisk')) {
+        $logger->log('Warning: Failed to chgrp uploads/.htaccess', 'WARNING');
+    }
     $logger->log('Created uploads/.htaccess', 'INFO');
 }
 
@@ -70,8 +86,12 @@ $templates_htaccess = $templates_dir . '/.htaccess';
 if (!file_exists($templates_htaccess)) {
     file_put_contents($templates_htaccess, $htaccess_content);
     @chmod($templates_htaccess, 0644);
-    @chown($templates_htaccess, 'asterisk');
-    @chgrp($templates_htaccess, 'asterisk');
+    if (!@chown($templates_htaccess, 'asterisk')) {
+        $logger->log('Warning: Failed to chown templates/.htaccess', 'WARNING');
+    }
+    if (!@chgrp($templates_htaccess, 'asterisk')) {
+        $logger->log('Warning: Failed to chgrp templates/.htaccess', 'WARNING');
+    }
     $logger->log('Created templates/.htaccess', 'INFO');
 }
 

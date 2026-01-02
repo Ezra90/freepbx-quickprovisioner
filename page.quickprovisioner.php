@@ -543,7 +543,9 @@ function downloadTemplate(model) {
 }
 
 function deleteTemplate(model) {
-    if (!confirm('Delete template "' + model + '"? This cannot be undone.')) {
+    // Escape model name to prevent XSS in confirm dialog
+    var escapedModel = $('<div>').text(model).html();
+    if (!confirm('Delete template "' + escapedModel + '"? This cannot be undone.')) {
         return;
     }
     $.post('ajax.quickprovisioner.php', {

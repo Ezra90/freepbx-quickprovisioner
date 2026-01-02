@@ -42,10 +42,11 @@ switch ($action) {
                 $response['message'] = 'Invalid wallpaper filename format';
                 break;
             }
-            // Verify file exists in uploads directory to prevent referencing non-existent files
-            $wallpaper_path = __DIR__ . '/assets/uploads/' . $wallpaper;
-            if (!file_exists($wallpaper_path)) {
-                $response['message'] = 'Wallpaper file does not exist';
+            // Verify file exists in uploads directory and prevent path traversal
+            $wallpaper_path = realpath(__DIR__ . '/assets/uploads/' . $wallpaper);
+            $uploads_dir = realpath(__DIR__ . '/assets/uploads');
+            if (!$wallpaper_path || !$uploads_dir || strpos($wallpaper_path, $uploads_dir) !== 0 || !file_exists($wallpaper_path)) {
+                $response['message'] = 'Wallpaper file does not exist or invalid path';
                 break;
             }
         }
@@ -248,7 +249,13 @@ switch ($action) {
             $response['message'] = 'Invalid filename format';
             break;
         }
-        $path = __DIR__ . '/assets/uploads/' . $filename;
+        // Use realpath to prevent directory traversal
+        $path = realpath(__DIR__ . '/assets/uploads/' . $filename);
+        $uploads_dir = realpath(__DIR__ . '/assets/uploads');
+        if (!$path || !$uploads_dir || strpos($path, $uploads_dir) !== 0) {
+            $response['message'] = 'Invalid file path';
+            break;
+        }
         if (file_exists($path) && unlink($path)) {
             \FreePBX::create()->Logger->log("Asset deleted: $filename");
             $response = ['status' => true];
@@ -265,9 +272,16 @@ switch ($action) {
             $response['message'] = 'Invalid model name';
             break;
         }
+        // Use realpath to prevent directory traversal
         $path = $templates_dir . '/' . $model . '.json';
-        if (!file_exists($path)) { $response['message'] = 'Template not found'; break; }
-        $json = file_get_contents($path);
+        $real_path = realpath($path);
+        $real_templates_dir = realpath($templates_dir);
+        if (!$real_path || !$real_templates_dir || strpos($real_path, $real_templates_dir) !== 0) {
+            $response['message'] = 'Template not found or invalid path';
+            break;
+        }
+        if (!file_exists($real_path)) { $response['message'] = 'Template not found'; break; }
+        $json = file_get_contents($real_path);
         $response = ['status' => true, 'json' => $json];
         break;
 
@@ -280,9 +294,22 @@ switch ($action) {
             $response['message'] = 'Invalid model name';
             break;
         }
+        // Ensure path stays within templates directory
         $path = $templates_dir . '/' . $data['model'] . '.json';
+        $real_templates_dir = realpath($templates_dir);
+        if (!$real_templates_dir) {
+            $response['message'] = 'Templates directory not accessible';
+            break;
+        }
         // Use PHP functions instead of shell_exec
         if (file_put_contents($path, $json, LOCK_EX) !== false) {
+            // Verify the file is actually in the templates directory after creation
+            $real_path = realpath($path);
+            if (!$real_path || strpos($real_path, $real_templates_dir) !== 0) {
+                @unlink($path);
+                $response['message'] = 'Security error: Invalid path';
+                break;
+            }
             @chmod($path, 0644);
             // Note: chown may fail if not running as root, but that's acceptable
             @chown($path, 'asterisk');
@@ -301,8 +328,15 @@ switch ($action) {
             $response['message'] = 'Invalid model name';
             break;
         }
+        // Use realpath to prevent directory traversal
         $path = $templates_dir . '/' . $model . '.json';
-        if (file_exists($path) && unlink($path)) {
+        $real_path = realpath($path);
+        $real_templates_dir = realpath($templates_dir);
+        if (!$real_path || !$real_templates_dir || strpos($real_path, $real_templates_dir) !== 0) {
+            $response['message'] = 'Template not found or invalid path';
+            break;
+        }
+        if (file_exists($real_path) && unlink($real_path)) {
             $response = ['status' => true];
         } else {
             $response['message'] = 'Delete failed';
