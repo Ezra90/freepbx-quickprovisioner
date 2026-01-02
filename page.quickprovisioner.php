@@ -204,7 +204,7 @@ var profiles = {};
 function loadDevices() {
     $('#deviceListBody').html('');
     <?php foreach ($devices as $d): ?>
-        var row = '<tr><td><?= $d["mac"] ?></td><td><?= $d["extension"] ?></td><td><?= $d["model"] ?></td><td><button onclick="editDevice(<?= $d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= $d["id"] ?>)">Delete</button></td></tr>';
+        var row = '<tr><td><?= htmlspecialchars($d["mac"], ENT_QUOTES, 'UTF-8') ?></td><td><?= htmlspecialchars($d["extension"], ENT_QUOTES, 'UTF-8') ?></td><td><?= htmlspecialchars($d["model"], ENT_QUOTES, 'UTF-8') ?></td><td><button onclick="editDevice(<?= (int)$d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= (int)$d["id"] ?>)">Delete</button></td></tr>';
         $('#deviceListBody').append(row);
     <?php endforeach; ?>
 }
@@ -236,8 +236,20 @@ function editDevice(id) {
 
 function deleteDevice(id) {
     if (confirm('Delete device?')) {
-        // Implement AJAX delete
-        loadDevices();
+        $.post('ajax.quickprovisioner.php', {
+            action: 'delete_device',
+            id: id,
+            csrf_token: '<?= $csrf_token ?>'
+        }, function(r) {
+            if (r.status) {
+                alert('Device deleted successfully');
+                loadDevices();
+            } else {
+                alert('Error: ' + (r.message || 'Unknown error'));
+            }
+        }, 'json').fail(function() {
+            alert('Delete request failed');
+        });
     }
 }
 
@@ -257,9 +269,11 @@ function loadTemplates() {
             $('#templatesList').html('');
             $('#model').html('');
             r.list.forEach(function(t) {
-                var row = '<tr><td>' + t.model + '</td><td>' + t.display_name + '</td><td><button onclick="downloadTemplate(\'' + t.model + '\')">Download</button> <button onclick="deleteTemplate(\'' + t.model + '\')">Delete</button></td></tr>';
+                var model = $('<div>').text(t.model).html();
+                var display_name = $('<div>').text(t.display_name).html();
+                var row = '<tr><td>' + model + '</td><td>' + display_name + '</td><td><button onclick="downloadTemplate(\'' + model.replace(/'/g, "\\'") + '\')">Download</button> <button onclick="deleteTemplate(\'' + model.replace(/'/g, "\\'") + '\')">Delete</button></td></tr>';
                 $('#templatesList').append(row);
-                $('#model').append('<option value="' + t.model + '">' + t.display_name + '</option>');
+                $('#model').append('<option value="' + model + '">' + display_name + '</option>');
             });
         }
     }, 'json');

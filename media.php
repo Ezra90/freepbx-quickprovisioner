@@ -15,7 +15,8 @@ if (!$authorized && isset($_SERVER['PHP_AUTH_USER'])) {
     $pass = $_SERVER['PHP_AUTH_PW'] ?? '';
     $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE extension=?", [$ext]);
     if ($device) {
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+        $deviceInfo = \FreePBX::Core()->getDevice($ext);
+        $secret = isset($deviceInfo['secret']) ? $deviceInfo['secret'] : '';
         if ($pass === $secret) {
             $authorized = true;
         }

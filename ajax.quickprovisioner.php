@@ -1,11 +1,12 @@
 <?php
 // ajax.quickprovisioner.php - HH Quick Provisioner v2.1 - Backend API
+session_start();
+
 if (!defined('FREEPBX_IS_AUTH') || !FREEPBX_IS_AUTH) {
     die(json_encode(['status' => false, 'message' => 'Unauthorized']));
 }
 
 global $db;
-session_start();
 $action = $_REQUEST['action'] ?? '';
 $response = ['status' => false, 'message' => 'Invalid action'];
 
@@ -30,8 +31,29 @@ switch ($action) {
         $custom_options_json = json_encode($form['custom_options'] ?? []);
         $custom_template_override = $form['custom_template_override'] ?? '';
         $wallpaper = $form['wallpaper'] ?? '';
+        
+        // Validate wallpaper filename - only allow safe characters
+        if (!empty($wallpaper)) {
+            $wallpaper = basename($wallpaper);
+            if (!preg_match('/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif)$/i', $wallpaper)) {
+                $response['message'] = 'Invalid wallpaper filename';
+                break;
+            }
+        }
+        
         $wallpaper_mode = $form['wallpaper_mode'] ?? 'crop';
+        // Validate wallpaper_mode
+        if (!in_array($wallpaper_mode, ['crop', 'fit'])) {
+            $response['message'] = 'Invalid wallpaper mode';
+            break;
+        }
+        
         $security_pin = $form['security_pin'] ?? '';
+        // Validate security pin if provided
+        if (!empty($security_pin) && !preg_match('/^[0-9]{1,15}$/', $security_pin)) {
+            $response['message'] = 'Invalid security PIN - must be 1-15 digits';
+            break;
+        }
 
         $id = $form['deviceId'] ?? null;
         if ($id) {
@@ -53,7 +75,18 @@ switch ($action) {
         $response = ['status' => true, 'data' => $row ?: null];
         break;
 
-    // Assuming list_devices and delete_device are implemented; keep as is
+    case 'list_devices':
+        $rows = $db->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $response = ['status' => true, 'devices' => $rows];
+        break;
+
+    case 'delete_device':
+        $id = $_POST['id'] ?? null;
+        if (!$id) { $response['message'] = 'No ID'; break; }
+        $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [$id]);
+        \FreePBX::create()->Logger->log("Device deleted: ID=" . $id);
+        $response = ['status' => true];
+        break;
 
     case 'preview_config':
         $id = $_REQUEST['id'] ?? null;
@@ -153,7 +186,7 @@ switch ($action) {
 
     case 'upload_file':
         if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-            $response['message'] = 'Upload error: ' . $_FILES['file']['error'];
+            $response['message'] = 'Upload error: ' . ($_FILES['file']['error'] ?? 'unknown');
             break;
         }
         if ($_FILES['file']['size'] > 5 * 1024 * 1024) {
@@ -168,16 +201,22 @@ switch ($action) {
             break;
         }
         $ext = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
-        $filename = uniqid('asset_') . '.' . $ext;
+        // Validate extension
+        if (!in_array(strtolower($ext), ['jpg', 'jpeg', 'png', 'gif'])) {
+            $response['message'] = 'Invalid file extension';
+            break;
+        }
+        $filename = uniqid('asset_') . '.' . strtolower($ext);
         $target = __DIR__ . '/assets/uploads/' . $filename;
         if (!is_dir(dirname($target))) {
             mkdir(dirname($target), 0775, true);
         }
-        $temp_upload = tempnam(sys_get_temp_dir(), 'upload_');
-        if (move_uploaded_file($_FILES['file']['tmp_name'], $temp_upload)) {
-            shell_exec("sudo mv " . escapeshellarg($temp_upload) . " " . escapeshellarg($target));
-            shell_exec("sudo chmod 0644 " . escapeshellarg($target));
-            shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($target));
+        // Use PHP functions instead of shell_exec
+        if (move_uploaded_file($_FILES['file']['tmp_name'], $target)) {
+            @chmod($target, 0644);
+            // Note: chown may fail if not running as root, but that's acceptable
+            @chown($target, 'asterisk');
+            @chgrp($target, 'asterisk');
             \FreePBX::create()->Logger->log("Asset uploaded: $filename");
             $response = ['status' => true, 'url' => $filename];
         } else {
@@ -187,6 +226,11 @@ switch ($action) {
 
     case 'delete_asset':
         $filename = basename($_POST['filename'] ?? '');
+        // Validate filename - only allow safe characters
+        if (!preg_match('/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif)$/i', $filename)) {
+            $response['message'] = 'Invalid filename';
+            break;
+        }
         $path = __DIR__ . '/assets/uploads/' . $filename;
         if (file_exists($path) && unlink($path)) {
             \FreePBX::create()->Logger->log("Asset deleted: $filename");
@@ -199,6 +243,11 @@ switch ($action) {
     case 'get_driver':
         $model = $_REQUEST['model'] ?? '';
         if (!$model) { $response['message'] = 'No model'; break; }
+        // Validate model name - only allow safe characters
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $model)) {
+            $response['message'] = 'Invalid model name';
+            break;
+        }
         $path = $templates_dir . '/' . $model . '.json';
         if (!file_exists($path)) { $response['message'] = 'Template not found'; break; }
         $json = file_get_contents($path);
@@ -209,12 +258,18 @@ switch ($action) {
         $json = $_POST['json'] ?? '';
         $data = json_decode($json, true);
         if (!$data || empty($data['model'])) { $response['message'] = 'Invalid JSON or no model'; break; }
+        // Validate model name - only allow safe characters
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $data['model'])) {
+            $response['message'] = 'Invalid model name';
+            break;
+        }
         $path = $templates_dir . '/' . $data['model'] . '.json';
-        $temp_path = tempnam(sys_get_temp_dir(), 'json_');
-        if (file_put_contents($temp_path, $json)) {
-            shell_exec("sudo mv " . escapeshellarg($temp_path) . " " . escapeshellarg($path));
-            shell_exec("sudo chmod 0644 " . escapeshellarg($path));
-            shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($path));
+        // Use PHP functions instead of shell_exec
+        if (file_put_contents($path, $json, LOCK_EX) !== false) {
+            @chmod($path, 0644);
+            // Note: chown may fail if not running as root, but that's acceptable
+            @chown($path, 'asterisk');
+            @chgrp($path, 'asterisk');
             $response = ['status' => true];
         } else {
             $response['message'] = 'Write failed';
@@ -224,6 +279,11 @@ switch ($action) {
     case 'delete_driver':
         $model = $_POST['model'] ?? '';
         if (!$model) { $response['message'] = 'No model'; break; }
+        // Validate model name - only allow safe characters
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $model)) {
+            $response['message'] = 'Invalid model name';
+            break;
+        }
         $path = $templates_dir . '/' . $model . '.json';
         if (file_exists($path) && unlink($path)) {
             $response = ['status' => true];
