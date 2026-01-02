@@ -45,24 +45,23 @@ function setPermissionsSafely($path, $is_dir = false, $logger = null) {
     $success = true;
     
     // Try to set permissions using PHP
-    if ($is_dir) {
-        if (!@chmod($path, 0775)) {
-            if ($logger) $logger->log("Could not set permissions for directory: $path", 'WARNING');
-            $success = false;
-        }
-    } else {
-        if (!@chmod($path, 0664)) {
-            if ($logger) $logger->log("Could not set permissions for file: $path", 'WARNING');
-            $success = false;
-        }
+    $target_perms = $is_dir ? 0775 : 0664;
+    if (!@chmod($path, $target_perms)) {
+        $type = $is_dir ? 'directory' : 'file';
+        if ($logger) $logger->log("Could not set permissions for $type: $path", 'WARNING');
+        $success = false;
     }
     
     // Try to set ownership (may require elevated privileges)
-    // Use posix functions if available, otherwise skip with warning
+    // Use posix functions if available, otherwise skip
     if (function_exists('posix_getpwnam')) {
         $asterisk_user = @posix_getpwnam('asterisk');
         if ($asterisk_user) {
-            if (!(@chown($path, $asterisk_user['uid']) && @chgrp($path, $asterisk_user['gid']))) {
+            $chown_ok = @chown($path, $asterisk_user['uid']);
+            $chgrp_ok = @chgrp($path, $asterisk_user['gid']);
+            
+            if (!$chown_ok || !$chgrp_ok) {
+                // This is DEBUG level because ownership may already be correct
                 if ($logger) $logger->log("Could not set ownership for: $path (this may be OK if already correct)", 'DEBUG');
             }
         }
