@@ -120,9 +120,17 @@ function install_module() {
                     continue;
                 }
                 
-                // Set proper ownership to asterisk:asterisk
-                // Using exec with @ suppressor in case sudo is not available
-                @exec("chown asterisk:asterisk " . escapeshellarg($dir) . " 2>&1", $output, $return_code);
+                // Set proper ownership to asterisk:asterisk using PHP's chown
+                // Fallback to exec if chown() fails (permission issue)
+                if (!@chown($dir, 'asterisk')) {
+                    // Try using exec as fallback
+                    exec("chown asterisk:asterisk " . escapeshellarg($dir) . " 2>&1", $output, $return_code);
+                    if ($return_code !== 0 && class_exists('FreePBX')) {
+                        FreePBX::create()->Logger->log("Quick Provisioner: Warning - Could not set ownership on $dir");
+                    }
+                } else {
+                    @chgrp($dir, 'asterisk');
+                }
                 
                 if (class_exists('FreePBX')) {
                     FreePBX::create()->Logger->log("Quick Provisioner: Created directory $dir");
@@ -130,15 +138,46 @@ function install_module() {
             }
         }
         
-        // Set proper permissions on the module directory
-        @exec("chmod -R 755 " . escapeshellarg($module_path) . " 2>&1", $output, $return_code);
-        @exec("chown -R asterisk:asterisk " . escapeshellarg($module_path) . " 2>&1", $output, $return_code);
+        // Recursively set permissions on module directory
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($module_path, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        
+        foreach ($iterator as $item) {
+            // Validate path is within module directory to prevent directory traversal
+            $realPath = realpath($item->getPathname());
+            $realModulePath = realpath($module_path);
+            if ($realPath === false || strpos($realPath, $realModulePath) !== 0) {
+                continue;
+            }
+            
+            if ($item->isDir()) {
+                @chmod($item->getPathname(), 0755);
+                if (!@chown($item->getPathname(), 'asterisk')) {
+                    @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
+                } else {
+                    @chgrp($item->getPathname(), 'asterisk');
+                }
+            } else {
+                @chmod($item->getPathname(), 0644);
+                if (!@chown($item->getPathname(), 'asterisk')) {
+                    @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
+                } else {
+                    @chgrp($item->getPathname(), 'asterisk');
+                }
+            }
+        }
         
         // Ensure uploads directory has write permissions for web server
         $uploads_dir = $module_path . '/assets/uploads';
         if (is_dir($uploads_dir)) {
-            @exec("chmod 775 " . escapeshellarg($uploads_dir) . " 2>&1", $output, $return_code);
-            @exec("chown asterisk:asterisk " . escapeshellarg($uploads_dir) . " 2>&1", $output, $return_code);
+            if (!@chmod($uploads_dir, 0775)) {
+                exec("chmod 775 " . escapeshellarg($uploads_dir) . " 2>&1", $output, $return_code);
+                if ($return_code !== 0 && class_exists('FreePBX')) {
+                    FreePBX::create()->Logger->log("Quick Provisioner: Warning - Could not set permissions on $uploads_dir");
+                }
+            }
         }
         
         // Create .htaccess for uploads directory to prevent direct execution
@@ -148,8 +187,14 @@ function install_module() {
             $htaccess_content .= "php_flag engine off\n";
             $htaccess_content .= "Options -ExecCGI -Indexes\n";
             $htaccess_content .= "AddType text/plain .php .php3 .phtml .pht\n";
-            @file_put_contents($htaccess_path, $htaccess_content);
-            @chmod($htaccess_path, 0644);
+            if (@file_put_contents($htaccess_path, $htaccess_content)) {
+                @chmod($htaccess_path, 0644);
+                if (!@chown($htaccess_path, 'asterisk')) {
+                    @exec("chown asterisk:asterisk " . escapeshellarg($htaccess_path) . " 2>&1");
+                } else {
+                    @chgrp($htaccess_path, 'asterisk');
+                }
+            }
         }
         
         if (class_exists('FreePBX')) {
