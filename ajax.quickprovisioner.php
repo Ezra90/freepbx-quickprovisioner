@@ -1,6 +1,9 @@
 <?php
 // ajax.quickprovisioner.php - HH Quick Provisioner v2.1 - Backend API
-session_start();
+// Start session only if not already started (FreePBX may have already started it)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!defined('FREEPBX_IS_AUTH') || !FREEPBX_IS_AUTH) {
     die(json_encode(['status' => false, 'message' => 'Unauthorized']));
@@ -199,11 +202,18 @@ switch ($action) {
             $response['message'] = 'File too large (max 5MB)';
             break;
         }
+        // Validate MIME type
         $allowed_mimes = ['image/jpeg', 'image/png', 'image/gif'];
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($_FILES['file']['tmp_name']);
         if (!in_array($mime, $allowed_mimes)) {
             $response['message'] = 'Invalid file type';
+            break;
+        }
+        // Additional validation: verify it's actually a valid image
+        $imageInfo = @getimagesize($_FILES['file']['tmp_name']);
+        if ($imageInfo === false) {
+            $response['message'] = 'File is not a valid image';
             break;
         }
         $ext = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
@@ -232,9 +242,9 @@ switch ($action) {
 
     case 'delete_asset':
         $filename = basename($_POST['filename'] ?? '');
-        // Validate filename - only allow safe characters
-        if (!preg_match('/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif)$/i', $filename)) {
-            $response['message'] = 'Invalid filename';
+        // Validate filename - must match upload pattern
+        if (!preg_match('/^asset_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $filename)) {
+            $response['message'] = 'Invalid filename format';
             break;
         }
         $path = __DIR__ . '/assets/uploads/' . $filename;

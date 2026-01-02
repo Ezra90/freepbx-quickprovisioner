@@ -266,14 +266,27 @@ foreach ($directories_to_fix as $dir) {
     );
 
     foreach ($iterator as $item) {
+        $path = $item->getPathname();
         if ($item->isDir()) {
-            @chmod($item->getPathname(), 0775);
-            @chown($item->getPathname(), 'asterisk');
-            @chgrp($item->getPathname(), 'asterisk');
+            if (!@chmod($path, 0775)) {
+                $logger->log("Warning: Failed to chmod directory: $path", 'WARNING');
+            }
+            if (!@chown($path, 'asterisk')) {
+                $logger->log("Warning: Failed to chown directory: $path (may require elevated privileges)", 'WARNING');
+            }
+            if (!@chgrp($path, 'asterisk')) {
+                $logger->log("Warning: Failed to chgrp directory: $path (may require elevated privileges)", 'WARNING');
+            }
         } else {
-            @chmod($item->getPathname(), 0664);
-            @chown($item->getPathname(), 'asterisk');
-            @chgrp($item->getPathname(), 'asterisk');
+            if (!@chmod($path, 0664)) {
+                $logger->log("Warning: Failed to chmod file: $path", 'WARNING');
+            }
+            if (!@chown($path, 'asterisk')) {
+                $logger->log("Warning: Failed to chown file: $path (may require elevated privileges)", 'WARNING');
+            }
+            if (!@chgrp($path, 'asterisk')) {
+                $logger->log("Warning: Failed to chgrp file: $path (may require elevated privileges)", 'WARNING');
+            }
         }
     }
 }

@@ -614,12 +614,9 @@ function uploadAsset() {
 }
 
 function loadAssets() {
-    var assetDir = 'assets/uploads/';
-    $('#assetGrid').html('<p>Loading assets...</p>');
-    
-    // Since there's no list_assets action, we'll just show a placeholder
-    // In a real implementation, you'd want to add a list_assets action to ajax.quickprovisioner.php
-    $('#assetGrid').html('<p>Asset listing functionality not yet implemented. Use the upload button to add assets.</p>');
+    // Note: Full asset listing not implemented yet
+    // Assets can be uploaded via the Upload button and will be available for selection
+    $('#assetGrid').html('<div class="alert alert-info">Upload assets using the button above. Uploaded files will be available for wallpaper and contact photo selection.</div>');
 }
 
 $('#deviceForm').submit(function(e) {
