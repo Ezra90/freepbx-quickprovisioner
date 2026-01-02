@@ -5,9 +5,50 @@ if (!defined('FREEPBX_IS_AUTH') || !FREEPBX_IS_AUTH) {
 }
 
 global $db;
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $action = $_REQUEST['action'] ?? '';
 $response = ['status' => false, 'message' => 'Invalid action'];
+
+// Helper functions for safe file operations
+function qp_safe_write($filepath, $content) {
+    $dir = dirname($filepath);
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0775, true)) {
+            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
+        }
+    }
+    if (file_put_contents($filepath, $content) === false) {
+        return ['status' => false, 'message' => 'Failed to write file: ' . basename($filepath)];
+    }
+    chmod($filepath, 0644);
+    return ['status' => true];
+}
+
+function qp_safe_delete($filepath) {
+    if (!file_exists($filepath)) {
+        return ['status' => false, 'message' => 'File not found: ' . basename($filepath)];
+    }
+    if (!unlink($filepath)) {
+        return ['status' => false, 'message' => 'Failed to delete file: ' . basename($filepath)];
+    }
+    return ['status' => true];
+}
+
+function qp_safe_move_upload($tmp_file, $target) {
+    $dir = dirname($target);
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0775, true)) {
+            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
+        }
+    }
+    if (!move_uploaded_file($tmp_file, $target)) {
+        return ['status' => false, 'message' => 'Failed to move uploaded file'];
+    }
+    chmod($target, 0644);
+    return ['status' => true];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (!isset($_REQUEST['csrf_token']) || $_REQUEST['csrf_token'] !== $_SESSION['qp_csrf'])) {
     $response['message'] = 'CSRF validation failed';
@@ -53,14 +94,25 @@ switch ($action) {
         $response = ['status' => true, 'data' => $row ?: null];
         break;
 
-    // Assuming list_devices and delete_device are implemented; keep as is
+    case 'list_devices':
+        $rows = $db->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $response = ['status' => true, 'devices' => $rows];
+        break;
+
+    case 'delete_device':
+        $id = $_REQUEST['id'] ?? null;
+        if (!$id) { $response['message'] = 'No ID'; break; }
+        $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [$id]);
+        \FreePBX::create()->Logger->log("Device deleted: ID=$id");
+        $response = ['status' => true];
+        break;
 
     case 'preview_config':
         $id = $_REQUEST['id'] ?? null;
         if (!$id) { $response['message'] = 'No ID'; break; }
         $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE id=?", [$id]);
         if (!$device) { $response['message'] = 'Device not found'; break; }
-        $model = $device['model'];
+        $model = basename($device['model']); // Sanitize to prevent path traversal
         $profile_path = $templates_dir . '/' . $model . '.json';
         if (!file_exists($profile_path)) { $response['message'] = 'Profile not found'; break; }
         $profile_json = file_get_contents($profile_path);
@@ -167,37 +219,37 @@ switch ($action) {
             $response['message'] = 'Invalid file type';
             break;
         }
-        $ext = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+        $ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed_extensions)) {
+            $response['message'] = 'Invalid file extension';
+            break;
+        }
         $filename = uniqid('asset_') . '.' . $ext;
         $target = __DIR__ . '/assets/uploads/' . $filename;
-        if (!is_dir(dirname($target))) {
-            mkdir(dirname($target), 0775, true);
-        }
-        $temp_upload = tempnam(sys_get_temp_dir(), 'upload_');
-        if (move_uploaded_file($_FILES['file']['tmp_name'], $temp_upload)) {
-            shell_exec("sudo mv " . escapeshellarg($temp_upload) . " " . escapeshellarg($target));
-            shell_exec("sudo chmod 0644 " . escapeshellarg($target));
-            shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($target));
+        $result = qp_safe_move_upload($_FILES['file']['tmp_name'], $target);
+        if ($result['status']) {
             \FreePBX::create()->Logger->log("Asset uploaded: $filename");
             $response = ['status' => true, 'url' => $filename];
         } else {
-            $response['message'] = 'Move failed: Check server permissions/logs';
+            $response['message'] = $result['message'];
         }
         break;
 
     case 'delete_asset':
         $filename = basename($_POST['filename'] ?? '');
         $path = __DIR__ . '/assets/uploads/' . $filename;
-        if (file_exists($path) && unlink($path)) {
+        $result = qp_safe_delete($path);
+        if ($result['status']) {
             \FreePBX::create()->Logger->log("Asset deleted: $filename");
             $response = ['status' => true];
         } else {
-            $response['message'] = 'File not found or delete failed';
+            $response['message'] = $result['message'];
         }
         break;
 
     case 'get_driver':
-        $model = $_REQUEST['model'] ?? '';
+        $model = basename($_REQUEST['model'] ?? ''); // Sanitize to prevent path traversal
         if (!$model) { $response['message'] = 'No model'; break; }
         $path = $templates_dir . '/' . $model . '.json';
         if (!file_exists($path)) { $response['message'] = 'Template not found'; break; }
@@ -209,26 +261,25 @@ switch ($action) {
         $json = $_POST['json'] ?? '';
         $data = json_decode($json, true);
         if (!$data || empty($data['model'])) { $response['message'] = 'Invalid JSON or no model'; break; }
-        $path = $templates_dir . '/' . $data['model'] . '.json';
-        $temp_path = tempnam(sys_get_temp_dir(), 'json_');
-        if (file_put_contents($temp_path, $json)) {
-            shell_exec("sudo mv " . escapeshellarg($temp_path) . " " . escapeshellarg($path));
-            shell_exec("sudo chmod 0644 " . escapeshellarg($path));
-            shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($path));
+        $model = basename($data['model']); // Sanitize to prevent path traversal
+        $path = $templates_dir . '/' . $model . '.json';
+        $result = qp_safe_write($path, $json);
+        if ($result['status']) {
             $response = ['status' => true];
         } else {
-            $response['message'] = 'Write failed';
+            $response['message'] = $result['message'];
         }
         break;
 
     case 'delete_driver':
-        $model = $_POST['model'] ?? '';
+        $model = basename($_POST['model'] ?? ''); // Sanitize to prevent path traversal
         if (!$model) { $response['message'] = 'No model'; break; }
         $path = $templates_dir . '/' . $model . '.json';
-        if (file_exists($path) && unlink($path)) {
+        $result = qp_safe_delete($path);
+        if ($result['status']) {
             $response = ['status' => true];
         } else {
-            $response['message'] = 'Delete failed';
+            $response['message'] = $result['message'];
         }
         break;
 

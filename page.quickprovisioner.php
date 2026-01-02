@@ -9,7 +9,9 @@ foreach ($users as $user) {
     $extensions[] = $user['extension'];
 }
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['qp_csrf'])) {
     $_SESSION['qp_csrf'] = bin2hex(random_bytes(32));
 }
@@ -204,7 +206,7 @@ var profiles = {};
 function loadDevices() {
     $('#deviceListBody').html('');
     <?php foreach ($devices as $d): ?>
-        var row = '<tr><td><?= $d["mac"] ?></td><td><?= $d["extension"] ?></td><td><?= $d["model"] ?></td><td><button onclick="editDevice(<?= $d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= $d["id"] ?>)">Delete</button></td></tr>';
+        var row = '<tr><td>' + <?= json_encode($d["mac"]) ?> + '</td><td>' + <?= json_encode($d["extension"]) ?> + '</td><td>' + <?= json_encode($d["model"]) ?> + '</td><td><button onclick="editDevice(<?= $d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= $d["id"] ?>)">Delete</button></td></tr>';
         $('#deviceListBody').append(row);
     <?php endforeach; ?>
 }
@@ -236,8 +238,14 @@ function editDevice(id) {
 
 function deleteDevice(id) {
     if (confirm('Delete device?')) {
-        // Implement AJAX delete
-        loadDevices();
+        $.post('ajax.quickprovisioner.php', {action:'delete_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+            if (r.status) {
+                alert('Device deleted');
+                loadDevices();
+            } else {
+                alert('Error: ' + r.message);
+            }
+        }, 'json');
     }
 }
 

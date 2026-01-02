@@ -104,9 +104,7 @@ if (is_dir($assets_dir)) {
 }
 
 // --- 5. Final ownership and permission cleanup ---
-// Ensure any remaining files are properly owned (consistent with install.php pattern)
-shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-$logger->log('Fixed ownership for remaining module files', 'INFO');
-
+// Note: Direct PHP file operations now handle permissions correctly
+// No sudo needed as the web server user already has proper group permissions
 $logger->log('HH Quick Provisioner uninstall completed', 'INFO');
 ?>

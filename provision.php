@@ -16,7 +16,7 @@ if (!$device) {
     die("Device not found");
 }
 
-$model = $device['model'];
+$model = basename($device['model']); // Sanitize to prevent path traversal
 $profile_path = __DIR__ . '/templates/' . $model . '.json';
 if (!file_exists($profile_path)) {
     die("Template not found for model $model");
@@ -24,6 +24,10 @@ if (!file_exists($profile_path)) {
 
 $profile_json = file_get_contents($profile_path);
 $profile = json_decode($profile_json, true);
+
+if ($profile === null) {
+    die("Invalid template JSON for model $model");
+}
 
 $content_type = $profile['provisioning']['content_type'] ?? 'text/plain';
 $filename_pattern = $profile['provisioning']['filename_pattern'] ?? '{mac}.cfg';
@@ -63,7 +67,7 @@ $vars = [
 
 foreach ($custom_options as $key => $value) {
     if ($value !== '') {
-        $vars[$key] = $value;
+        $vars['{{' . $key . '}}'] = $value;
     }
 }
 
