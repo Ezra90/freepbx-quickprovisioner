@@ -7,6 +7,25 @@ global $amp_conf;
 $logger = FreePBX::create()->Logger;
 $logger->log('Starting HH Quick Provisioner install', 'INFO');
 
+// --- Early Permission Fix ---
+// Fix ownership immediately at start, before any operations
+// This handles cases where the module was cloned from git with root ownership
+$module_dir = __DIR__;
+$assets_dir_early = $module_dir . '/assets';
+
+// Ensure assets directory exists with correct permissions
+if (!is_dir($assets_dir_early)) {
+    mkdir($assets_dir_early, 0775, true);
+}
+
+// Fix ownership and permissions on module directory and assets
+// This runs before any other file operations to ensure correct permissions
+shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg($module_dir));
+shell_exec("sudo find " . escapeshellarg($module_dir) . " -type d -exec chmod 775 {} \\;");
+shell_exec("sudo find " . escapeshellarg($module_dir) . " -type f -exec chmod 664 {} \\;");
+
+$logger->log('Applied early permission fix to module directory', 'INFO');
+
 // --- 1. Devices Table ---
 $db->query("CREATE TABLE IF NOT EXISTS `quickprovisioner_devices` (
     `id` INT(11) NOT NULL AUTO_INCREMENT,
