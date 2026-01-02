@@ -35,8 +35,14 @@ switch ($action) {
         // Validate wallpaper filename - only allow safe characters
         if (!empty($wallpaper)) {
             $wallpaper = basename($wallpaper);
-            if (!preg_match('/^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif)$/i', $wallpaper)) {
-                $response['message'] = 'Invalid wallpaper filename';
+            if (!preg_match('/^asset_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $wallpaper)) {
+                $response['message'] = 'Invalid wallpaper filename format';
+                break;
+            }
+            // Verify file exists in uploads directory to prevent referencing non-existent files
+            $wallpaper_path = __DIR__ . '/assets/uploads/' . $wallpaper;
+            if (!file_exists($wallpaper_path)) {
+                $response['message'] = 'Wallpaper file does not exist';
                 break;
             }
         }

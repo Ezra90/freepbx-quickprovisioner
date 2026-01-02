@@ -269,11 +269,23 @@ function loadTemplates() {
             $('#templatesList').html('');
             $('#model').html('');
             r.list.forEach(function(t) {
-                var model = $('<div>').text(t.model).html();
-                var display_name = $('<div>').text(t.display_name).html();
-                var row = '<tr><td>' + model + '</td><td>' + display_name + '</td><td><button onclick="downloadTemplate(\'' + model.replace(/'/g, "\\'") + '\')">Download</button> <button onclick="deleteTemplate(\'' + model.replace(/'/g, "\\'") + '\')">Delete</button></td></tr>';
-                $('#templatesList').append(row);
-                $('#model').append('<option value="' + model + '">' + display_name + '</option>');
+                // Create elements safely using jQuery to avoid XSS
+                var $row = $('<tr>');
+                $row.append($('<td>').text(t.model));
+                $row.append($('<td>').text(t.display_name));
+                var $actions = $('<td>');
+                var $downloadBtn = $('<button>').text('Download').on('click', function() {
+                    downloadTemplate(t.model);
+                });
+                var $deleteBtn = $('<button>').text('Delete').on('click', function() {
+                    deleteTemplate(t.model);
+                });
+                $actions.append($downloadBtn).append(' ').append($deleteBtn);
+                $row.append($actions);
+                $('#templatesList').append($row);
+                
+                // Safely add option to select
+                $('#model').append($('<option>').val(t.model).text(t.display_name));
             });
         }
     }, 'json');
@@ -506,6 +518,50 @@ function showExampleJSON() {
     $('#driverInput').val(example);
 }
 
+function downloadTemplate(model) {
+    $.post('ajax.quickprovisioner.php', {
+        action: 'get_driver',
+        model: model,
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status) {
+            var blob = new Blob([r.json], {type: 'application/json'});
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = model + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            alert('Error: ' + (r.message || 'Unknown error'));
+        }
+    }, 'json').fail(function() {
+        alert('Download request failed');
+    });
+}
+
+function deleteTemplate(model) {
+    if (!confirm('Delete template "' + model + '"? This cannot be undone.')) {
+        return;
+    }
+    $.post('ajax.quickprovisioner.php', {
+        action: 'delete_driver',
+        model: model,
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status) {
+            alert('Template deleted successfully');
+            loadTemplates();
+        } else {
+            alert('Error: ' + (r.message || 'Unknown error'));
+        }
+    }, 'json').fail(function() {
+        alert('Delete request failed');
+    });
+}
+
 function loadSipSecret() {
     var ext = $('#extension').val();
     if (!ext) {
@@ -555,6 +611,15 @@ function uploadAsset() {
             }
         }
     });
+}
+
+function loadAssets() {
+    var assetDir = 'assets/uploads/';
+    $('#assetGrid').html('<p>Loading assets...</p>');
+    
+    // Since there's no list_assets action, we'll just show a placeholder
+    // In a real implementation, you'd want to add a list_assets action to ajax.quickprovisioner.php
+    $('#assetGrid').html('<p>Asset listing functionality not yet implemented. Use the upload button to add assets.</p>');
 }
 
 $('#deviceForm').submit(function(e) {

@@ -254,22 +254,27 @@ if (empty($existing_files)) {
     ]);
 }
 
-// Final permission sweep - set permissions recursively using PHP
-// Note: This is a best-effort approach, may not work in all environments
-$iterator = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator(__DIR__, RecursiveDirectoryIterator::SKIP_DOTS),
-    RecursiveIteratorIterator::SELF_FIRST
-);
+// Final permission sweep - set permissions only for specific directories
+$directories_to_fix = [$assets_dir, $uploads_dir, $templates_dir];
 
-foreach ($iterator as $item) {
-    if ($item->isDir()) {
-        @chmod($item->getPathname(), 0775);
-        @chown($item->getPathname(), 'asterisk');
-        @chgrp($item->getPathname(), 'asterisk');
-    } else {
-        @chmod($item->getPathname(), 0664);
-        @chown($item->getPathname(), 'asterisk');
-        @chgrp($item->getPathname(), 'asterisk');
+foreach ($directories_to_fix as $dir) {
+    if (!is_dir($dir)) continue;
+    
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        if ($item->isDir()) {
+            @chmod($item->getPathname(), 0775);
+            @chown($item->getPathname(), 'asterisk');
+            @chgrp($item->getPathname(), 'asterisk');
+        } else {
+            @chmod($item->getPathname(), 0664);
+            @chown($item->getPathname(), 'asterisk');
+            @chgrp($item->getPathname(), 'asterisk');
+        }
     }
 }
 
