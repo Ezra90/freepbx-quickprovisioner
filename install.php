@@ -105,6 +105,12 @@ function install_module() {
     $success = true;
     
     try {
+        // Check if asterisk user exists on the system
+        $asterisk_user_exists = false;
+        if (function_exists('posix_getpwnam')) {
+            $asterisk_user_exists = @posix_getpwnam('asterisk') !== false;
+        }
+        
         // Define directories that need to be created
         $directories = [
             $module_path . '/assets',
@@ -120,16 +126,21 @@ function install_module() {
                     continue;
                 }
                 
-                // Set proper ownership to asterisk:asterisk using PHP's chown
-                // Fallback to exec if chown() fails (permission issue)
-                if (!@chown($dir, 'asterisk')) {
-                    // Try using exec as fallback
-                    exec("chown asterisk:asterisk " . escapeshellarg($dir) . " 2>&1", $output, $return_code);
-                    if ($return_code !== 0 && class_exists('FreePBX')) {
-                        FreePBX::create()->Logger->log("Quick Provisioner: Warning - Could not set ownership on $dir");
+                // Set proper ownership to asterisk:asterisk if user exists
+                if ($asterisk_user_exists) {
+                    if (!@chown($dir, 'asterisk')) {
+                        // Try using exec as fallback only within module directory
+                        $realPath = realpath($dir);
+                        $realModulePath = realpath($module_path);
+                        if ($realPath !== false && strpos($realPath, $realModulePath) === 0) {
+                            exec("chown asterisk:asterisk " . escapeshellarg($dir) . " 2>&1", $output, $return_code);
+                            if ($return_code !== 0 && class_exists('FreePBX')) {
+                                FreePBX::create()->Logger->log("Quick Provisioner: Warning - Could not set ownership on $dir");
+                            }
+                        }
+                    } else {
+                        @chgrp($dir, 'asterisk');
                     }
-                } else {
-                    @chgrp($dir, 'asterisk');
                 }
                 
                 if (class_exists('FreePBX')) {
@@ -138,33 +149,36 @@ function install_module() {
             }
         }
         
-        // Recursively set permissions on module directory
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($module_path, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST
-        );
-        
-        foreach ($iterator as $item) {
-            // Validate path is within module directory to prevent directory traversal
-            $realPath = realpath($item->getPathname());
-            $realModulePath = realpath($module_path);
-            if ($realPath === false || strpos($realPath, $realModulePath) !== 0) {
-                continue;
-            }
+        // Recursively set permissions only on assets directory (not entire module)
+        $assets_dir = $module_path . '/assets';
+        if (is_dir($assets_dir)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($assets_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
             
-            if ($item->isDir()) {
-                @chmod($item->getPathname(), 0755);
-                if (!@chown($item->getPathname(), 'asterisk')) {
-                    @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
-                } else {
-                    @chgrp($item->getPathname(), 'asterisk');
+            foreach ($iterator as $item) {
+                // Validate path is within assets directory to prevent directory traversal
+                $realPath = realpath($item->getPathname());
+                $realAssetsPath = realpath($assets_dir);
+                if ($realPath === false || strpos($realPath, $realAssetsPath) !== 0) {
+                    continue;
                 }
-            } else {
-                @chmod($item->getPathname(), 0644);
-                if (!@chown($item->getPathname(), 'asterisk')) {
-                    @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
+                
+                if ($item->isDir()) {
+                    @chmod($item->getPathname(), 0755);
+                    if ($asterisk_user_exists && !@chown($item->getPathname(), 'asterisk')) {
+                        @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
+                    } elseif ($asterisk_user_exists) {
+                        @chgrp($item->getPathname(), 'asterisk');
+                    }
                 } else {
-                    @chgrp($item->getPathname(), 'asterisk');
+                    @chmod($item->getPathname(), 0644);
+                    if ($asterisk_user_exists && !@chown($item->getPathname(), 'asterisk')) {
+                        @exec("chown asterisk:asterisk " . escapeshellarg($item->getPathname()) . " 2>&1");
+                    } elseif ($asterisk_user_exists) {
+                        @chgrp($item->getPathname(), 'asterisk');
+                    }
                 }
             }
         }
@@ -189,9 +203,9 @@ function install_module() {
             $htaccess_content .= "AddType text/plain .php .php3 .phtml .pht\n";
             if (@file_put_contents($htaccess_path, $htaccess_content)) {
                 @chmod($htaccess_path, 0644);
-                if (!@chown($htaccess_path, 'asterisk')) {
+                if ($asterisk_user_exists && !@chown($htaccess_path, 'asterisk')) {
                     @exec("chown asterisk:asterisk " . escapeshellarg($htaccess_path) . " 2>&1");
-                } else {
+                } elseif ($asterisk_user_exists) {
                     @chgrp($htaccess_path, 'asterisk');
                 }
             }
@@ -226,17 +240,28 @@ function uninstall_module() {
     $module_path = __DIR__;
     
     try {
-        // Clean up uploaded assets
+        // Clean up uploaded assets recursively
         $uploads_dir = $module_path . '/assets/uploads';
         
         if (is_dir($uploads_dir)) {
-            // Remove all files in uploads directory
-            $files = glob($uploads_dir . '/*');
-            if ($files !== false) {
-                foreach ($files as $file) {
-                    if (is_file($file)) {
-                        @unlink($file);
-                    }
+            // Recursively remove all files and subdirectories
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($uploads_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
+            
+            foreach ($iterator as $item) {
+                // Validate path is within uploads directory
+                $realPath = realpath($item->getPathname());
+                $realUploadsPath = realpath($uploads_dir);
+                if ($realPath === false || strpos($realPath, $realUploadsPath) !== 0) {
+                    continue;
+                }
+                
+                if ($item->isDir()) {
+                    @rmdir($item->getPathname());
+                } else {
+                    @unlink($item->getPathname());
                 }
             }
             
