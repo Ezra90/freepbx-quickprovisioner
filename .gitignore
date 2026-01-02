@@ -5,11 +5,14 @@ composer.lock
 .phpunit.result.cache
 
 # QuickProvisioner User Uploads and Generated Files
+# Exclude user-uploaded wallpapers and photos
 assets/uploads/*
 !assets/uploads/.gitkeep
-assets/*
-!assets/.gitkeep
-templates/*.json
+# Exclude downloaded background images (generated during install)
+assets/*.png
+assets/*.jpg
+assets/*.jpeg
+assets/*.gif
 
 # IDE and Editor Files
 .vscode/
