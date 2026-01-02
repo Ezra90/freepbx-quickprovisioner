@@ -104,15 +104,9 @@ if (is_dir($assets_dir)) {
 }
 
 // --- 5. Final ownership and permission cleanup ---
-// Ensure any remaining files are properly owned
-try {
-    shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-    $logger->log('Fixed ownership for remaining module files', 'INFO');
-} catch(Exception $e) {
-    $logger->log('Error fixing ownership: ' . $e->getMessage(), 'ERROR');
-}
+// Ensure any remaining files are properly owned (consistent with install.php pattern)
+shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
+$logger->log('Fixed ownership for remaining module files', 'INFO');
 
-if ($logger) {
-    $logger->log('HH Quick Provisioner uninstall completed', 'INFO');
-}
+$logger->log('HH Quick Provisioner uninstall completed', 'INFO');
 ?>
