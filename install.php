@@ -1,258 +1,206 @@
 <?php
-if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
+/**
+ * Quick Provisioner Installation Script
+ * Handles initial setup and configuration
+ */
 
-global $db;
-global $amp_conf;
-
-$logger = FreePBX::create()->Logger;
-$logger->log('Starting HH Quick Provisioner install', 'INFO');
-
-// --- 1. Devices Table ---
-$db->query("CREATE TABLE IF NOT EXISTS `quickprovisioner_devices` (
-    `id` INT(11) NOT NULL AUTO_INCREMENT,
-    `mac` VARCHAR(17) NOT NULL,
-    `model` VARCHAR(50) NOT NULL,
-    `extension` VARCHAR(20) NOT NULL,
-    `wallpaper` VARCHAR(255),
-    `wallpaper_mode` VARCHAR(20) DEFAULT 'crop',
-    `security_pin` VARCHAR(10),
-    `keys_json` LONGTEXT,
-    `contacts_json` LONGTEXT,
-    `custom_options_json` JSON,
-    `custom_template_override` TEXT,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `mac_idx` (`mac`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-// Safe upgrades
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN wallpaper VARCHAR(255)"); } catch(Exception $e) {}
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN wallpaper_mode VARCHAR(20) DEFAULT 'crop'"); } catch(Exception $e) {}
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN security_pin VARCHAR(10)"); } catch(Exception $e) {}
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN contacts_json LONGTEXT"); } catch(Exception $e) {}
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN custom_options_json JSON"); } catch(Exception $e) {}
-try { $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN custom_template_override TEXT"); } catch(Exception $e) {}
-
-// Drop old profiles table if exists
-try { $db->query("DROP TABLE IF EXISTS `quickprovisioner_profiles`"); } catch(Exception $e) {}
-
-// --- 2. Asset & Templates Directories ---
-$assets_dir     = __DIR__ . '/assets';
-$uploads_dir    = $assets_dir . '/uploads';
-$templates_dir  = __DIR__ . '/templates';
-
-// Create directories with proper permissions early
-if (!is_dir($assets_dir))    { mkdir($assets_dir,    0777, true); }  // Temp 0777 for web write
-if (!is_dir($uploads_dir))   { mkdir($uploads_dir,   0777, true); }
-if (!is_dir($templates_dir)) { mkdir($templates_dir, 0777, true); }
-
-// Immediately fix ownership and permissions (run as root via sudo if needed; adjust for your distro)
-shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type d -exec chmod 775 {} \\;");
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type f -exec chmod 664 {} \\;");
-
-// Create .htaccess using temp file + mv (web-safe)
-$htaccess_content = "Deny from all";
-$temp_htaccess = tempnam(sys_get_temp_dir(), 'htaccess_');
-file_put_contents($temp_htaccess, $htaccess_content);
-
-$uploads_htaccess = $uploads_dir . '/.htaccess';
-if (!file_exists($uploads_htaccess)) {
-    shell_exec("sudo mv " . escapeshellarg($temp_htaccess) . " " . escapeshellarg($uploads_htaccess));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($uploads_htaccess));
-    $logger->log('Created uploads/.htaccess', 'INFO');
+// Check if already installed
+$config_file = dirname(__FILE__) . '/config.php';
+if (file_exists($config_file) && filesize($config_file) > 100) {
+    die("Quick Provisioner is already installed. Delete config.php to reinstall.");
 }
 
-$temp_htaccess = tempnam(sys_get_temp_dir(), 'htaccess_');  // Recreate for templates
-file_put_contents($temp_htaccess, $htaccess_content);
+// Create necessary directories
+$dirs = array(
+    'logs' => dirname(__FILE__) . '/logs',
+    'cache' => dirname(__FILE__) . '/cache',
+    'uploads' => dirname(__FILE__) . '/uploads',
+    'data' => dirname(__FILE__) . '/data'
+);
 
-$templates_htaccess = $templates_dir . '/.htaccess';
-if (!file_exists($templates_htaccess)) {
-    shell_exec("sudo mv " . escapeshellarg($temp_htaccess) . " " . escapeshellarg($templates_htaccess));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($templates_htaccess));
-    $logger->log('Created templates/.htaccess', 'INFO');
-}
-
-// --- 3. Helper: Key Generation ---
-function generateKeys($count, $layoutType, $params) {
-    $keys = [];
-    $startX = $params['startX'];
-    $startY = $params['startY'];
-    $perPage = $params['maxPerPage'] ?? 10;
-
-    if ($layoutType === 'dual_column') {
-        $half = ceil($perPage / 2);
-        $stepY = $params['stepY'];
-        $rightOffset = $params['rightOffset'];
-
-        for ($i = 0; $i < $count; $i++) {
-            $page = floor($i / $perPage) + 1;
-            $idxOnPage = $i % $perPage;
-            $isRight = ($idxOnPage >= $half);
-            $idxInCol = $isRight ? $idxOnPage - $half : $idxOnPage;
-
-            $keys[] = [
-                'index' => $i + 1,
-                'x' => $isRight ? $rightOffset : $startX,
-                'y' => $startY + ($idxInCol * $stepY),
-                'label_align' => $isRight ? 'right' : 'left',
-                'page' => $page,
-                'info' => 'Programmable key'
-            ];
-        }
-    } elseif ($layoutType === 'grid') {
-        $cols = $params['cols'] ?? 5;
-        $stepX = $params['stepX'] ?? 150;
-        $stepY = $params['stepY'] ?? 80;
-
-        for ($i = 0; $i < $count; $i++) {
-            $page = floor($i / $perPage) + 1;
-            $idxOnPage = $i % $perPage;
-            $row = floor($idxOnPage / $cols);
-            $col = $idxOnPage % $cols;
-
-            $keys[] = [
-                'index' => $i + 1,
-                'x' => $startX + ($col * $stepX),
-                'y' => $startY + ($row * $stepY),
-                'label_align' => 'center',
-                'page' => $page,
-                'info' => 'Grid key'
-            ];
+foreach ($dirs as $dir_name => $dir_path) {
+    if (!is_dir($dir_path)) {
+        if (!mkdir($dir_path, 0775, true)) {
+            die("Failed to create $dir_name directory");
         }
     }
-    return $keys;
 }
 
-// --- 4. Helper: Install Profile ---
-function installProfile($data) {
-    global $templates_dir, $logger;
-    $model = $data['model'];
-    $path = $templates_dir . '/' . $model . '.json';
+// Create config.php
+$config_content = '<?php
+// Quick Provisioner Configuration
+// Generated on ' . date('Y-m-d H:i:s') . '
 
-    // For remote image, use temp + mv
-    if (!empty($data['visual_editor']['remote_image_url'])) {
-        $url = $data['visual_editor']['remote_image_url'];
-        $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-        $localName = preg_replace('/[^a-zA-Z0-9_-]/', '', $model) . '.' . $ext;
-        $localPath = __DIR__ . '/assets/' . $localName;
+// Database Configuration
+$config = array(
+    "db_host" => "localhost",
+    "db_user" => "root",
+    "db_pass" => "",
+    "db_name" => "quickprovisioner",
+    "app_path" => "' . dirname(__FILE__) . '",
+    "base_url" => "http://localhost/quickprovisioner"
+);
+?>';
 
-        if (!file_exists($localPath)) {
-            $opts = ["http" => ["header" => "User-Agent: HHPro\r\n"], "ssl" => ["verify_peer" => false]];
-            $img = @file_get_contents($url, false, stream_context_create($opts));
-            if ($img) {
-                $temp_img = tempnam(sys_get_temp_dir(), 'img_');
-                file_put_contents($temp_img, $img);
-                shell_exec("sudo mv " . escapeshellarg($temp_img) . " " . escapeshellarg($localPath));
-                shell_exec("sudo chmod 0644 " . escapeshellarg($localPath));
-                shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($localPath));
-                $data['visual_editor']['background_image_url'] = 'assets/' . $localName;
-                $logger->log("Downloaded background for $model", 'INFO');
-            } else {
-                $logger->log("Failed to download background for $model", 'WARNING');
-            }
-        } else {
-            $data['visual_editor']['background_image_url'] = 'assets/' . $localName;
-        }
+if (!file_put_contents($config_file, $config_content)) {
+    die("Failed to create config.php");
+}
+
+// Set proper permissions on config.php
+chmod($config_file, 0644);
+
+// Create .htaccess for logs directory
+$htaccess_logs = dirname(__FILE__) . '/logs/.htaccess';
+$htaccess_content = 'Deny from all' . PHP_EOL;
+if (!file_put_contents($htaccess_logs, $htaccess_content)) {
+    die("Failed to create logs/.htaccess");
+}
+
+// Create .htaccess for cache directory
+$htaccess_cache = dirname(__FILE__) . '/cache/.htaccess';
+if (!file_put_contents($htaccess_cache, $htaccess_content)) {
+    die("Failed to create cache/.htaccess");
+}
+
+// Create .htaccess for uploads directory
+$htaccess_uploads = dirname(__FILE__) . '/uploads/.htaccess';
+$upload_htaccess = 'Deny from all' . PHP_EOL . 'AddType text/plain .*' . PHP_EOL;
+if (!file_put_contents($htaccess_uploads, $upload_htaccess)) {
+    die("Failed to create uploads/.htaccess");
+}
+
+// Set proper permissions on directories
+chmod(dirname(__FILE__) . '/logs', 0775);
+chmod(dirname(__FILE__) . '/cache', 0775);
+chmod(dirname(__FILE__) . '/uploads', 0775);
+chmod(dirname(__FILE__) . '/data', 0775);
+
+// Create database tables
+require_once($config_file);
+
+$conn = new mysqli($config['db_host'], $config['db_user'], $config['db_pass'], $config['db_name']);
+
+if ($conn->connect_error) {
+    die("Database connection failed: " . $conn->connect_error);
+}
+
+// Create tables
+$sql_files = array(
+    'devices' => "CREATE TABLE IF NOT EXISTS devices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        device_name VARCHAR(255) NOT NULL,
+        device_type VARCHAR(100),
+        mac_address VARCHAR(17) UNIQUE,
+        ip_address VARCHAR(45),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )",
+    'configurations' => "CREATE TABLE IF NOT EXISTS configurations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        device_id INT,
+        config_data LONGTEXT,
+        version INT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (device_id) REFERENCES devices(id)
+    )",
+    'provisioning_logs' => "CREATE TABLE IF NOT EXISTS provisioning_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        device_id INT,
+        log_message TEXT,
+        status VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (device_id) REFERENCES devices(id)
+    )"
+);
+
+foreach ($sql_files as $table => $sql) {
+    if (!$conn->query($sql)) {
+        die("Error creating $table table: " . $conn->error);
     }
-
-    $json = json_encode($data);
-    $temp_json = tempnam(sys_get_temp_dir(), 'json_');
-    file_put_contents($temp_json, $json);
-    shell_exec("sudo mv " . escapeshellarg($temp_json) . " " . escapeshellarg($path));
-    shell_exec("sudo chmod 0644 " . escapeshellarg($path));
-    shell_exec("sudo chown asterisk:asterisk " . escapeshellarg($path));
-    $logger->log("Installed template: $model", 'INFO');
 }
 
-// --- 5. Default Profiles (only if templates folder is empty) ---
-$existing_files = glob($templates_dir . '/*.json');
-if (empty($existing_files)) {
-    $logger->log('No templates found — installing defaults', 'INFO');
+// Create initial admin user
+$admin_username = 'admin';
+$admin_password = password_hash('admin123', PASSWORD_BCRYPT);
 
-    $yealinkTpl = "#!version:1.0.0.1\naccount.1.enable = 1\naccount.1.label = {{display_name}}\naccount.1.display_name = {{display_name}}\naccount.1.auth_name = {{extension}}\naccount.1.user_name = {{extension}}\naccount.1.password = {{password}}\naccount.1.sip_server.1.address = {{server_host}}\naccount.1.sip_server.1.port = {{server_port}}\nphone_setting.backgrounds = {{wallpaper}}\n{{line_keys_loop}}\nlinekey.{{index}}.type = {{type}}\nlinekey.{{index}}.value = {{value}}\nlinekey.{{index}}.label = {{label}}\n{{/line_keys_loop}}\n{{contacts_loop}}\nremote_phonebook.data.1.url = {{contacts_url_example}}\n{{/contacts_loop}}\n# Enable the phone lock feature\n{{if phone_setting.keyboard_lock}}phone_setting.keyboard_lock = {{phone_setting.keyboard_lock}}\n{{/if}}\n# Set lock type: 0-Lock all keys; 1-Lock all except dial pad\n{{if phone_setting.keyboard_lock.type}}phone_setting.keyboard_lock.type = {{phone_setting.keyboard_lock.type}}\n{{/if}}\n# Define the unlock PIN (up to 15 characters)\n{{if phone_setting.keyboard_lock.password}}phone_setting.keyboard_lock.password = {{phone_setting.keyboard_lock.password}}\n{{/if}}\n# Idle time before auto-locking (in seconds)\n{{if phone_setting.keyboard_lock.timeout}}phone_setting.keyboard_lock.timeout = {{phone_setting.keyboard_lock.timeout}}\n{{/if}}\n# Hide the \"Menu\" softkey entirely to prevent tampering\n{{if features.enhanced_dss_keys.enable}}features.enhanced_dss_keys.enable = {{features.enhanced_dss_keys.enable}}\n{{/if}}\n{{if softkey.1.enable}}softkey.1.enable = {{softkey.1.enable}}\n{{/if}}\n{{if softkey.1.label}}softkey.1.label = {{softkey.1.label}}\n{{/if}}\n# Change default admin password for web/phone interface\n{{if static.security.admin_password}}static.security.admin_password = {{static.security.admin_password}}\n{{/if}}\n# Disable the web interface for total lockdown (requires factory reset to re-enable)\n{{if static.network.web_server.enable}}static.network.web_server.enable = {{static.network.web_server.enable}}\n{{/if}}\n# Disable Zero Touch (prevents kids from accidentally triggering provisioning at boot)\n{{if static.zero_touch.enable}}static.zero_touch.enable = {{static.zero_touch.enable}}\n{{/if}}\n# Set a custom wallpaper (URL must be accessible by the phone)\n{{if phone_setting.backgrounds}}phone_setting.backgrounds = {{phone_setting.backgrounds}}\n{{/if}}\n# Enable and configure a screensaver\n{{if screensaver.enable}}screensaver.enable = {{screensaver.enable}}\n{{/if}}\n{{if screensaver.wait_time}}screensaver.wait_time = {{screensaver.wait_time}}\n{{/if}}\n{{if screensaver.type}}screensaver.type = {{screensaver.type}}\n{{/if}}\n{{if screensaver.upload_url}}screensaver.upload_url = {{screensaver.upload_url}}\n{{/if}}\n# Set the phone's display name (appears on screen)\n{{if account.1.display_name}}account.1.display_name = {{account.1.display_name}}\n{{/if}}\n# Enable Hotline / Hot Dialing for Account 1\n{{if account.1.hotline_number}}account.1.hotline_number = {{account.1.hotline_number}}\n{{/if}}\n{{if account.1.hotline_delay}}account.1.hotline_delay = {{account.1.hotline_delay}}\n{{/if}}\n# Reduce wait time after last digit is pressed before dialing automatically\n{{if phone_setting.inter_digit_timer}}phone_setting.inter_digit_timer = {{phone_setting.inter_digit_timer}}\n{{/if}}\n";
+$sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?) 
+        ON DUPLICATE KEY UPDATE password=VALUES(password)";
+$stmt = $conn->prepare($sql);
+$role = 'admin';
+$stmt->bind_param("sss", $admin_username, $admin_password, $role);
 
-    $configurable_options = [
-        ['name' => 'phone_setting.keyboard_lock', 'type' => 'bool', 'default' => 1, 'label' => 'Enable Phone Lock', 'description' => 'Enable the phone lock feature'],
-        ['name' => 'phone_setting.keyboard_lock.type', 'type' => 'select', 'default' => 1, 'label' => 'Lock Type', 'description' => 'Set lock type: 0-Lock all keys; 1-Lock all except dial pad', 'options' => ['0' => 'Lock all keys', '1' => 'Lock all except dial pad']],
-        ['name' => 'phone_setting.keyboard_lock.password', 'type' => 'text', 'default' => '1234', 'label' => 'Unlock PIN', 'description' => 'Define the unlock PIN (up to 15 characters)'],
-        ['name' => 'phone_setting.keyboard_lock.timeout', 'type' => 'number', 'default' => 60, 'label' => 'Auto-Lock Timeout', 'description' => 'Idle time before auto-locking (in seconds)', 'min' => 0, 'max' => 3600],
-        ['name' => 'features.enhanced_dss_keys.enable', 'type' => 'bool', 'default' => 1, 'label' => 'Enable Enhanced DSS Keys', 'description' => ''],
-        ['name' => 'softkey.1.enable', 'type' => 'bool', 'default' => 0, 'label' => 'Enable Menu Softkey', 'description' => 'Hide the "Menu" softkey entirely to prevent tampering'],
-        ['name' => 'softkey.1.label', 'type' => 'text', 'default' => 'Menu', 'label' => 'Menu Softkey Label', 'description' => ''],
-        ['name' => 'static.security.admin_password', 'type' => 'text', 'default' => 'NewAdminPass2026', 'label' => 'Admin Password', 'description' => 'Change default admin password for web/phone interface'],
-        ['name' => 'static.network.web_server.enable', 'type' => 'bool', 'default' => 0, 'label' => 'Enable Web Interface', 'description' => 'Disable the web interface for total lockdown (requires factory reset to re-enable)'],
-        ['name' => 'static.zero_touch.enable', 'type' => 'bool', 'default' => 0, 'label' => 'Enable Zero Touch', 'description' => 'Disable Zero Touch (prevents kids from accidentally triggering provisioning at boot)'],
-        ['name' => 'phone_setting.backgrounds', 'type' => 'text', 'default' => '192.168.1.50', 'label' => 'Custom Wallpaper URL', 'description' => 'Set a custom wallpaper (URL must be accessible by the phone)'],
-        ['name' => 'screensaver.enable', 'type' => 'bool', 'default' => 1, 'label' => 'Enable Screensaver', 'description' => 'Enable and configure a screensaver'],
-        ['name' => 'screensaver.wait_time', 'type' => 'number', 'default' => 300, 'label' => 'Screensaver Wait Time', 'description' => '', 'min' => 0, 'max' => 3600],
-        ['name' => 'screensaver.type', 'type' => 'number', 'default' => 1, 'label' => 'Screensaver Type', 'description' => ''],
-        ['name' => 'screensaver.upload_url', 'type' => 'text', 'default' => '192.168.1.50', 'label' => 'Screensaver Upload URL', 'description' => ''],
-        ['name' => 'account.1.display_name', 'type' => 'text', 'default' => 'Home Office', 'label' => 'Display Name', 'description' => 'Set the phone\'s display name (appears on screen)'],
-        ['name' => 'account.1.hotline_number', 'type' => 'text', 'default' => '[PhoneNumber]', 'label' => 'Hotline Number', 'description' => 'Enable Hotline / Hot Dialing for Account 1'],
-        ['name' => 'account.1.hotline_delay', 'type' => 'number', 'default' => 0, 'label' => 'Hotline Delay', 'description' => 'Delay before dialing (0 = immediate, 4 = wait 4 seconds)', 'min' => 0, 'max' => 10],
-        ['name' => 'phone_setting.inter_digit_timer', 'type' => 'number', 'default' => 2, 'label' => 'Inter Digit Timer', 'description' => 'Reduce wait time after last digit is pressed before dialing automatically', 'min' => 1, 'max' => 10]
-    ];
-
-    $t54wKeys = generateKeys(27, 'dual_column', ['startX' => 20, 'startY' => 100, 'stepY' => 40, 'rightOffset' => 430, 'maxPerPage' => 10]);
-
-    installProfile([
-        "manufacturer" => "Yealink",
-        "model" => "T54W",
-        "display_name" => "Yealink T54W",
-        "max_line_keys" => 27,
-        "button_layout" => "dual_column",
-        "svg_fallback" => true,
-        "notes" => "Wallpaper: 480x272 JPG/PNG recommended.",
-        "options" => ["provisioning_server" => "http://yourserver/qp"],
-        "configurable_options" => $configurable_options,
-        "visual_editor" => [
-            "screen_width" => 480,
-            "screen_height" => 272,
-            "remote_image_url" => "https://www.yealink.com/wp-content/uploads/2023/06/SIP-T54W-1.png",
-            "schematic" => ["chassis_width" => 650, "chassis_height" => 550, "screen_x" => 152, "screen_y" => 48, "screen_width" => 345, "screen_height" => 195],
-            "keys" => $t54wKeys
-        ],
-        "provisioning" => [
-            "content_type" => "text/plain",
-            "filename_pattern" => "{mac}.cfg",
-            "type_mapping" => ["line" => "15", "speed_dial" => "13", "blf" => "16"],
-            "template" => $yealinkTpl
-        ]
-    ]);
-
-    $t48gKeys = generateKeys(29, 'grid', ['startX' => 50, 'startY' => 100, 'cols' => 3, 'stepX' => 200, 'stepY' => 80, 'maxPerPage' => 10]);
-    installProfile([
-        "manufacturer" => "Yealink",
-        "model" => "T48G",
-        "display_name" => "Yealink T48G",
-        "max_line_keys" => 29,
-        "button_layout" => "grid",
-        "svg_fallback" => true,
-        "notes" => "Wallpaper: 800x480 JPG/PNG recommended. Touch screen model.",
-        "options" => ["provisioning_server" => "http://yourserver/qp"],
-        "configurable_options" => $configurable_options,
-        "visual_editor" => [
-            "screen_width" => 800,
-            "screen_height" => 480,
-            "remote_image_url" => "https://www.yealink.com/website-service/attachment/product/image/20220505/20220505081634628a8fbe2554cb0a0fe603f82981fdd.png",
-            "schematic" => ["chassis_width" => 800, "chassis_height" => 600, "screen_x" => 100, "screen_y" => 50, "screen_width" => 600, "screen_height" => 360],
-            "keys" => $t48gKeys
-        ],
-        "provisioning" => [
-            "content_type" => "text/plain",
-            "filename_pattern" => "{mac}.cfg",
-            "type_mapping" => ["line" => "15", "speed_dial" => "13", "blf" => "16"],
-            "template" => $yealinkTpl
-        ]
-    ]);
+if (!$stmt->execute()) {
+    die("Error creating admin user: " . $stmt->error);
 }
 
-// Final permission sweep (in case anything was missed)
-shell_exec("sudo chown -R asterisk:asterisk " . escapeshellarg(__DIR__));
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type d -exec chmod 775 {} \\;");
-shell_exec("sudo find " . escapeshellarg(__DIR__) . " -type f -exec chmod 664 {} \\;");
-
-if ($logger) {
-    $logger->log('HH Quick Provisioner install completed', 'INFO');
+// Create session directory
+$session_dir = dirname(__FILE__) . '/sessions';
+if (!is_dir($session_dir)) {
+    if (!mkdir($session_dir, 0775, true)) {
+        die("Failed to create sessions directory");
+    }
 }
+
+// Set proper permissions on session directory
+chmod($session_dir, 0775);
+
+// Create index.php if it doesn't exist
+$index_file = dirname(__FILE__) . '/index.php';
+$index_content = '<?php
+session_start();
+require_once("config.php");
+require_once("functions.php");
+
+// Redirect to login if not authenticated
+if (!isset($_SESSION["user_id"])) {
+    header("Location: login.php");
+    exit();
+}
+
+// Load main dashboard
+require_once("dashboard.php");
+?>';
+
+if (!file_exists($index_file)) {
+    if (!file_put_contents($index_file, $index_content)) {
+        die("Failed to create index.php");
+    }
+    chmod($index_file, 0644);
+}
+
+// Create templates directory
+$templates_dir = dirname(__FILE__) . '/templates';
+if (!is_dir($templates_dir)) {
+    if (!mkdir($templates_dir, 0775, true)) {
+        die("Failed to create templates directory");
+    }
+}
+
+// Set proper permissions on templates directory
+chmod($templates_dir, 0775);
+
+// Verify installations
+$required_files = array(
+    'config.php',
+    'index.php'
+);
+
+$missing_files = array();
+foreach ($required_files as $file) {
+    $file_path = dirname(__FILE__) . '/' . $file;
+    if (!file_exists($file_path)) {
+        $missing_files[] = $file;
+    }
+}
+
+if (!empty($missing_files)) {
+    die("Installation failed. Missing files: " . implode(", ", $missing_files));
+}
+
+// All done
+echo "Installation completed successfully!";
+echo "You can now access the Quick Provisioner at your configured base URL.";
+echo "Default credentials - Username: admin, Password: admin123";
+echo "Please change the password immediately after first login.";
 ?>
