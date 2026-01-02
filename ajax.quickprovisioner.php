@@ -197,7 +197,28 @@ switch ($action) {
 
     case 'upload_file':
         if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
-            $response['message'] = 'Upload error: ' . ($_FILES['file']['error'] ?? 'unknown');
+            // Map error codes to user-friendly messages without exposing internals
+            $error_msg = 'Upload failed';
+            if (isset($_FILES['file']['error'])) {
+                switch ($_FILES['file']['error']) {
+                    case UPLOAD_ERR_INI_SIZE:
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $error_msg = 'File too large';
+                        break;
+                    case UPLOAD_ERR_PARTIAL:
+                        $error_msg = 'Upload incomplete';
+                        break;
+                    case UPLOAD_ERR_NO_FILE:
+                        $error_msg = 'No file selected';
+                        break;
+                    case UPLOAD_ERR_NO_TMP_DIR:
+                    case UPLOAD_ERR_CANT_WRITE:
+                    case UPLOAD_ERR_EXTENSION:
+                        $error_msg = 'Server configuration error';
+                        break;
+                }
+            }
+            $response['message'] = $error_msg;
             break;
         }
         if ($_FILES['file']['size'] > 5 * 1024 * 1024) {

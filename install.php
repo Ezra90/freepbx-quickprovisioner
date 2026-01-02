@@ -280,9 +280,10 @@ $directories_to_fix = [$assets_dir, $uploads_dir, $templates_dir];
 foreach ($directories_to_fix as $dir) {
     if (!is_dir($dir)) continue;
     
+    // Use CHILD_FIRST to process files before directories (more efficient for permissions)
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
+        RecursiveIteratorIterator::CHILD_FIRST
     );
 
     foreach ($iterator as $item) {

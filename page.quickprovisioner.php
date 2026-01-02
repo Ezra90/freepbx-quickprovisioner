@@ -14,6 +14,7 @@ if (!isset($_SESSION['qp_csrf'])) {
     $_SESSION['qp_csrf'] = bin2hex(random_bytes(32));
 }
 $csrf_token = $_SESSION['qp_csrf'];
+$csrf_token_escaped = htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8');
 ?>
 <div class="container-fluid">
     <h1>HH Quick Provisioner v2.1.0</h1>
@@ -40,7 +41,7 @@ $csrf_token = $_SESSION['qp_csrf'];
         <div id="tab-edit" class="tab-pane fade">
             <form id="deviceForm">
                 <input type="hidden" id="deviceId">
-                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token_escaped; ?>">
                 <div class="row">
                     <div class="col-md-4">
                         <div class="form-group"><label>MAC Address</label><input type="text" id="mac" class="form-control" required></div>
@@ -211,7 +212,7 @@ function loadDevices() {
 
 function editDevice(id) {
     currentDeviceId = id;
-    $.post('ajax.quickprovisioner.php', {action:'get_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.quickprovisioner.php', {action:'get_device', id:id, csrf_token: '<?= $csrf_token_escaped ?>'}, function(r) {
         if (r.status) {
             var d = r.data;
             $('#deviceId').val(d.id);
@@ -239,7 +240,7 @@ function deleteDevice(id) {
         $.post('ajax.quickprovisioner.php', {
             action: 'delete_device',
             id: id,
-            csrf_token: '<?= $csrf_token ?>'
+            csrf_token: '<?= $csrf_token_escaped ?>'
         }, function(r) {
             if (r.status) {
                 alert('Device deleted successfully');
@@ -264,7 +265,7 @@ function newDevice() {
 }
 
 function loadTemplates() {
-    $.post('ajax.quickprovisioner.php', {action:'list_drivers', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.quickprovisioner.php', {action:'list_drivers', csrf_token: '<?= $csrf_token_escaped ?>'}, function(r) {
         if (r.status) {
             $('#templatesList').html('');
             $('#model').html('');
@@ -294,7 +295,7 @@ function loadTemplates() {
 function loadProfile() {
     var model = $('#model').val();
     if (!model) return;
-    $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token_escaped ?>'}, function(r) {
         if (r.status) {
             profiles[model] = JSON.parse(r.json);
             showModelNotes();
@@ -444,7 +445,7 @@ function clearKey() {
 
 function previewConfig() {
     if (!currentDeviceId) return alert('Save device first');
-    $.post('ajax.quickprovisioner.php', {action:'preview_config', id:currentDeviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.quickprovisioner.php', {action:'preview_config', id:currentDeviceId, csrf_token: '<?= $csrf_token_escaped ?>'}, function(r) {
         if (r.status) {
             $('#configPreview').val(r.config);
             $('#configPreviewModal').modal('show');
@@ -464,7 +465,7 @@ function importDriver() {
     $.post('ajax.quickprovisioner.php', {
         action: 'import_driver',
         json: json,
-        csrf_token: '<?= $csrf_token ?>'
+        csrf_token: '<?= $csrf_token_escaped ?>'
     }, function(r) {
         if (r.status) {
             $('#importFeedback').html('<div class="alert alert-success">Template imported successfully!</div>');
@@ -522,7 +523,7 @@ function downloadTemplate(model) {
     $.post('ajax.quickprovisioner.php', {
         action: 'get_driver',
         model: model,
-        csrf_token: '<?= $csrf_token ?>'
+        csrf_token: '<?= $csrf_token_escaped ?>'
     }, function(r) {
         if (r.status) {
             var blob = new Blob([r.json], {type: 'application/json'});
@@ -551,7 +552,7 @@ function deleteTemplate(model) {
     $.post('ajax.quickprovisioner.php', {
         action: 'delete_driver',
         model: model,
-        csrf_token: '<?= $csrf_token ?>'
+        csrf_token: '<?= $csrf_token_escaped ?>'
     }, function(r) {
         if (r.status) {
             alert('Template deleted successfully');
@@ -573,7 +574,7 @@ function loadSipSecret() {
     $.post('ajax.quickprovisioner.php', {
         action: 'get_sip_secret',
         extension: ext,
-        csrf_token: '<?= $csrf_token ?>'
+        csrf_token: '<?= $csrf_token_escaped ?>'
     }, function(r) {
         if (r.status) {
             $('#sip_secret_preview').val(r.secret);
@@ -598,7 +599,7 @@ function uploadAsset() {
     var fd = new FormData();
     fd.append('file', file);
     fd.append('action', 'upload_file');
-    fd.append('csrf_token', '<?= $csrf_token ?>');
+    fd.append('csrf_token', '<?= $csrf_token_escaped ?>');
     $.ajax({
         url: 'ajax.quickprovisioner.php',
         type: 'POST',
