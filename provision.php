@@ -13,14 +13,14 @@ function qp_is_local_network() {
 
 $mac = isset($_GET['mac']) ? strtoupper(preg_replace('/[^A-F0-9]/', '', $_GET['mac'])) : null;
 if (!$mac || strlen($mac) < 12) {
-    \FreePBX::create()->Logger->log("Invalid MAC attempt: " . ($mac ?? 'none'));
+    \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Invalid MAC attempt: " . ($mac ?? 'none'));
     die("Invalid or no MAC provided");
 }
 
 global $db;
 $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE mac=?", [$mac]);
 if (!$device) {
-    \FreePBX::create()->Logger->log("Device not found for MAC: $mac");
+    \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Device not found for MAC: $mac");
     http_response_code(404);
     die("Device not found");
 }
@@ -29,7 +29,7 @@ if (!$device) {
 if (!qp_is_local_network()) {
     // Log warning if remote provisioning over HTTP
     if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] !== 'on') {
-        \FreePBX::create()->Logger->log("WARNING: Remote provisioning over HTTP (non-HTTPS) for MAC: $mac");
+        \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "WARNING: Remote provisioning over HTTP (non-HTTPS) for MAC: $mac");
     }
     
     $prov_user = $device['prov_username'] ?? '';
@@ -39,7 +39,7 @@ if (!qp_is_local_network()) {
     if (empty($prov_user) || empty($prov_pass)) {
         header('WWW-Authenticate: Basic realm="Phone Provisioning"');
         header('HTTP/1.0 401 Unauthorized');
-        \FreePBX::create()->Logger->log("Remote provisioning denied - no credentials configured for MAC: $mac");
+        \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Remote provisioning denied - no credentials configured for MAC: $mac");
         die('Authentication required');
     }
     
@@ -49,7 +49,7 @@ if (!qp_is_local_network()) {
     if ($auth_user !== $prov_user || $auth_pass !== $prov_pass) {
         header('WWW-Authenticate: Basic realm="Phone Provisioning"');
         header('HTTP/1.0 401 Unauthorized');
-        \FreePBX::create()->Logger->log("Unauthorized provisioning attempt for MAC: $mac");
+        \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Unauthorized provisioning attempt for MAC: $mac");
         die('Authentication required');
     }
 }
