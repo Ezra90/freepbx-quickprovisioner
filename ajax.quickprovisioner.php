@@ -102,9 +102,13 @@ switch ($action) {
     case 'delete_device':
         $id = $_REQUEST['id'] ?? null;
         if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
-        $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
-        \FreePBX::create()->Logger->log("Device deleted: ID=$id");
-        $response = ['status' => true];
+        $stmt = $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
+        if ($stmt->rowCount() > 0) {
+            \FreePBX::create()->Logger->log("Device deleted: ID=$id");
+            $response = ['status' => true];
+        } else {
+            $response['message'] = 'Device not found';
+        }
         break;
 
     case 'preview_config':
