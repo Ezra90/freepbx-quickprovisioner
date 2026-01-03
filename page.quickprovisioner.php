@@ -44,25 +44,134 @@ if (!isset($_SESSION['qp_csrf'])) {
 }
 $csrf_token = $_SESSION['qp_csrf'];
 ?>
+<style>
+/* GUI Improvements - Loading and Feedback Styles */
+.form-group.has-error .form-control {
+    border-color: #a94442;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 6px #ce8483;
+}
+
+.form-group.has-success .form-control {
+    border-color: #3c763d;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 6px #67b168;
+}
+
+.form-control:focus {
+    border-color: #66afe9;
+    box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102, 175, 233, 0.6);
+}
+
+#loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+#loadingOverlay.show {
+    display: flex;
+}
+
+.loading-content {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.loading-content i {
+    color: #337ab7;
+}
+
+#notificationContainer {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    z-index: 9998;
+    max-width: 400px;
+}
+
+@media (max-width: 768px) {
+    #notificationContainer {
+        left: 20px;
+        right: 20px;
+        max-width: none;
+    }
+}
+</style>
+
 <div class="container-fluid">
-    <h1>HH Quick Provisioner v2.2.0</h1>
+    <h1><i class="fa fa-mobile"></i> HH Quick Provisioner v2.2.0</h1>
+    
+    <!-- Global Notification Container -->
+    <div id="notificationContainer"></div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div class="loading-content">
+            <i class="fa fa-spinner fa-spin fa-3x"></i>
+            <p style="margin-top:15px; font-size:16px;"><strong id="loadingMessage">Loading...</strong></p>
+        </div>
+    </div>
 
     <ul class="nav nav-tabs" role="tablist">
-        <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
-        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Provisioning</a></li>
-        <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
-        <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
-        <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
-        <li><a data-toggle="tab" href="#tab-admin">Admin</a></li>
+        <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()"><i class="fa fa-list"></i> Device List</a></li>
+        <li><a data-toggle="tab" href="#tab-edit"><i class="fa fa-edit"></i> Edit/Generate Provisioning</a></li>
+        <li><a data-toggle="tab" href="#tab-contacts"><i class="fa fa-address-book"></i> Contacts</a></li>
+        <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()"><i class="fa fa-image"></i> Asset Manager</a></li>
+        <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()"><i class="fa fa-mobile"></i> Handset Model Templates</a></li>
+        <li><a data-toggle="tab" href="#tab-admin"><i class="fa fa-cog"></i> Admin</a></li>
     </ul>
 
     <div class="tab-content" style="padding-top:20px;">
 
         <div id="tab-list" class="tab-pane fade in active">
-            <button class="btn btn-success" onclick="newDevice()">Add New</button>
-            <button class="btn btn-default" onclick="loadDevices()">Refresh</button>
-            <table class="table table-striped" style="margin-top:15px;">
-                <thead><tr><th>MAC</th><th>Extension</th><th>Secret</th><th>Model</th><th>Actions</th></tr></thead>
+            <div class="well well-sm">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <input type="text" id="deviceSearch" class="form-control" placeholder="Search MAC, Extension, Model...">
+                            <span class="input-group-addon"><i class="fa fa-search"></i></span>
+                        </div>
+                    </div>
+                    <div class="col-md-8 text-right">
+                        <button class="btn btn-success" onclick="newDevice()">
+                            <i class="fa fa-plus"></i> Add New Device
+                        </button>
+                        <button class="btn btn-default" onclick="loadDevices()">
+                            <i class="fa fa-refresh"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center" style="padding:60px 20px; display:none;">
+                <i class="fa fa-mobile fa-5x text-muted"></i>
+                <h3>No Devices Yet</h3>
+                <p class="text-muted">Get started by adding your first device.</p>
+                <button class="btn btn-success btn-lg" onclick="newDevice()">
+                    <i class="fa fa-plus"></i> Add Your First Device
+                </button>
+            </div>
+            
+            <table class="table table-striped table-hover" id="devicesTable" style="margin-top:15px;">
+                <thead>
+                    <tr>
+                        <th>MAC</th>
+                        <th>Extension</th>
+                        <th>Secret</th>
+                        <th>Model</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
                 <tbody id="deviceListBody"></tbody>
             </table>
         </div>
@@ -627,12 +736,163 @@ var currentContacts = [];
 var currentDeviceId = null;
 var profiles = {};
 var smartDialShortcuts = {}; // Stores digit => extension mappings
+var formChanged = false; // Track unsaved changes
+
+// ========================================
+// GUI HELPER FUNCTIONS - Priority 1 Improvements
+// ========================================
+
+/**
+ * Show loading overlay with custom message
+ */
+function showLoading(message) {
+    message = message || 'Loading...';
+    $('#loadingMessage').text(message);
+    $('#loadingOverlay').addClass('show');
+}
+
+/**
+ * Hide loading overlay
+ */
+function hideLoading() {
+    $('#loadingOverlay').removeClass('show');
+}
+
+/**
+ * Show success notification
+ */
+function showSuccess(message) {
+    var html = `
+        <div class="alert alert-success alert-dismissible fade in" role="alert" style="animation: slideInRight 0.3s;">
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <i class="fa fa-check-circle"></i> <strong>Success!</strong> ${message}
+        </div>
+    `;
+    $('#notificationContainer').append(html);
+    setTimeout(function() {
+        $('#notificationContainer .alert:first').fadeOut(function() { $(this).remove(); });
+    }, 4000);
+}
+
+/**
+ * Show error notification with optional details
+ */
+function showError(title, message, details) {
+    details = details || null;
+    var detailsHtml = details ? `<details style="margin-top:10px;"><summary>Technical Details</summary><pre style="margin-top:5px;">${details}</pre></details>` : '';
+    var html = `
+        <div class="alert alert-danger alert-dismissible fade in" role="alert" style="animation: slideInRight 0.3s;">
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <strong><i class="fa fa-exclamation-triangle"></i> ${title}</strong>
+            <p style="margin-bottom:0;">${message}</p>
+            ${detailsHtml}
+        </div>
+    `;
+    $('#notificationContainer').append(html);
+    setTimeout(function() {
+        $('#notificationContainer .alert:first').fadeOut(function() { $(this).remove(); });
+    }, 8000);
+}
+
+/**
+ * Show info notification
+ */
+function showInfo(message) {
+    var html = `
+        <div class="alert alert-info alert-dismissible fade in" role="alert" style="animation: slideInRight 0.3s;">
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+            <i class="fa fa-info-circle"></i> ${message}
+        </div>
+    `;
+    $('#notificationContainer').append(html);
+    setTimeout(function() {
+        $('#notificationContainer .alert:first').fadeOut(function() { $(this).remove(); });
+    }, 5000);
+}
+
+/**
+ * Handle AJAX errors consistently
+ */
+function handleAjaxError(xhr, status, error, userMessage) {
+    console.error('AJAX Error:', status, error, xhr);
+    hideLoading();
+    var details = 'Status: ' + status + '\nError: ' + error;
+    if (xhr.responseText) {
+        try {
+            var response = JSON.parse(xhr.responseText);
+            if (response.message) {
+                details += '\nServer Message: ' + response.message;
+            }
+        } catch (e) {
+            details += '\nResponse: ' + xhr.responseText.substring(0, 200);
+        }
+    }
+    showError('Operation Failed', userMessage || 'An error occurred. Please try again.', details);
+}
+
+// ========================================
+// UNSAVED CHANGES WARNING
+// ========================================
+
+// Track form changes
+$('#deviceForm').on('change', 'input, select, textarea', function() {
+    formChanged = true;
+});
+
+// Warn before tab switch
+$('a[data-toggle="tab"]').on('show.bs.tab', function(e) {
+    if (formChanged && $(e.relatedTarget).attr('href') !== '#tab-edit') {
+        if (!confirm('You have unsaved changes. Are you sure you want to leave this page?')) {
+            e.preventDefault();
+            return false;
+        }
+        formChanged = false;
+    }
+});
+
+// Browser navigation warning
+window.addEventListener('beforeunload', function(e) {
+    if (formChanged) {
+        var confirmationMessage = 'You have unsaved changes. Are you sure you want to leave?';
+        e.returnValue = confirmationMessage;
+        return confirmationMessage;
+    }
+});
+
+// ========================================
+// DEVICE SEARCH FUNCTIONALITY
+// ========================================
+
+$('#deviceSearch').on('keyup', function() {
+    var value = $(this).val().toLowerCase();
+    $('#deviceListBody tr').filter(function() {
+        $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+    });
+});
+
+// ========================================
+// MAIN DEVICE FUNCTIONS (Enhanced)
+// ========================================
 
 function loadDevices() {
+    showLoading('Loading devices...');
     $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        hideLoading();
         if (r.status) {
             $('#deviceListBody').html('');
-            r.devices.forEach(function(d) {
+            if (r.devices.length === 0) {
+                $('#devicesTable').hide();
+                $('#emptyState').show();
+            } else {
+                $('#devicesTable').show();
+                $('#emptyState').hide();
+                r.devices.forEach(function(d) {
                 var secretDisplay = '';
                 if (d.secret) {
                     // Display secret directly in plain text with source badge
@@ -650,21 +910,28 @@ function loadDevices() {
                 var mac = $('<div>').text(d.mac).html();
                 var ext = $('<div>').text(d.extension).html();
                 var model = $('<div>').text(d.model).html();
-                var row = '<tr><td>' + mac + '</td><td>' + ext + '</td><td>' + secretDisplay + '</td><td>' + model + '</td><td><button class="btn btn-sm btn-default" onclick="editDevice(' + d.id + ')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')">Delete</button></td></tr>';
+                var row = '<tr><td>' + mac + '</td><td>' + ext + '</td><td>' + secretDisplay + '</td><td>' + model + '</td><td class="text-center">';
+                row += '<button class="btn btn-sm btn-primary" onclick="editDevice(' + d.id + ')" title="Edit device"><i class="fa fa-edit"></i> Edit</button> ';
+                row += '<button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')" title="Delete device"><i class="fa fa-trash"></i> Delete</button></td></tr>';
                 $('#deviceListBody').append(row);
             });
+            }
         } else {
             var errorMsg = $('<div>').text(r.message || 'Unknown error').html();
-            $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Error loading devices: ' + errorMsg + '</td></tr>');
+            showError('Load Failed', 'Failed to load devices: ' + errorMsg);
+            $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Error loading devices</td></tr>');
         }
-    }, 'json').fail(function() {
+    }, 'json').fail(function(xhr, status, error) {
+        handleAjaxError(xhr, status, error, 'Failed to load devices. Please check your connection and try again.');
         $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Failed to load devices</td></tr>');
     });
 }
 
 function editDevice(id) {
     currentDeviceId = id;
+    showLoading('Loading device...');
     $.post('ajax.quickprovisioner.php', {action:'get_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        hideLoading();
         if (r.status) {
             var d = r.data;
             $('#deviceId').val(d.id);
@@ -725,25 +992,39 @@ function editDevice(id) {
             }
             $('#custom_template_override').val(d.custom_template_override);
             renderPreview();
+            formChanged = false; // Reset change tracking when loading device
+            $('a[href="#tab-edit"]').tab('show');
+        } else {
+            showError('Load Failed', 'Failed to load device details.');
         }
-    }, 'json');
-    $('a[href="#tab-edit"]').tab('show');
+    }, 'json').fail(function(xhr, status, error) {
+        handleAjaxError(xhr, status, error, 'Failed to load device details.');
+    });
 }
 
 function deleteDevice(id) {
-    if (confirm('Delete device?')) {
+    if (confirm('Are you sure you want to delete this device? This action cannot be undone.')) {
+        showLoading('Deleting device...');
         $.post('ajax.quickprovisioner.php', {action:'delete_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+            hideLoading();
             if (r.status) {
-                alert('Device deleted');
+                showSuccess('Device deleted successfully');
                 loadDevices();
             } else {
-                alert('Error: ' + r.message);
+                showError('Delete Failed', r.message || 'Failed to delete device');
             }
-        }, 'json');
+        }, 'json').fail(function(xhr, status, error) {
+            handleAjaxError(xhr, status, error, 'Failed to delete device.');
+        });
     }
 }
 
 function newDevice() {
+    if (formChanged) {
+        if (!confirm('You have unsaved changes. Are you sure you want to create a new device?')) {
+            return;
+        }
+    }
     $('#deviceForm')[0].reset();
     $('#deviceId').val('');
     $('#extension_select').val('');
@@ -765,21 +1046,35 @@ function newDevice() {
     updateSmartDialList();
     clearWallpaper();
     renderPreview();
+    formChanged = false; // Reset change tracking for new device
     $('a[href="#tab-edit"]').tab('show');
 }
 
 function loadTemplates() {
+    showLoading('Loading templates...');
     $.post('ajax.quickprovisioner.php', {action:'list_drivers', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        hideLoading();
         if (r.status) {
             $('#templatesList').html('');
             $('#model').html('');
-            r.list.forEach(function(t) {
-                var row = '<tr><td>' + t.model + '</td><td>' + t.display_name + '</td><td><button onclick="downloadTemplate(\'' + t.model + '\')">Download</button> <button onclick="deleteTemplate(\'' + t.model + '\')">Delete</button></td></tr>';
-                $('#templatesList').append(row);
-                $('#model').append('<option value="' + t.model + '">' + t.display_name + '</option>');
-            });
+            if (r.list.length === 0) {
+                $('#templatesList').html('<tr><td colspan="3" class="text-muted text-center">No templates found. Import a template to get started.</td></tr>');
+                showInfo('No templates found. Import a template from the Handset Model Templates tab.');
+            } else {
+                r.list.forEach(function(t) {
+                    var row = '<tr><td>' + t.model + '</td><td>' + t.display_name + '</td><td>';
+                    row += '<button class="btn btn-xs btn-info" onclick="downloadTemplate(\'' + t.model + '\')"><i class="fa fa-download"></i> Download</button> ';
+                    row += '<button class="btn btn-xs btn-danger" onclick="deleteTemplate(\'' + t.model + '\')"><i class="fa fa-trash"></i> Delete</button></td></tr>';
+                    $('#templatesList').append(row);
+                    $('#model').append('<option value="' + t.model + '">' + t.display_name + '</option>');
+                });
+            }
+        } else {
+            showError('Load Failed', 'Failed to load templates');
         }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+        handleAjaxError(xhr, status, error, 'Failed to load templates.');
+    });
 }
 
 function loadProfile() {
@@ -789,8 +1084,10 @@ function loadProfile() {
         return;
     }
     console.log('Loading template for model:', model);
+    showLoading('Loading template...');
     
     $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        hideLoading();
         console.log('Template response:', r);
         if (r.status) {
             try {
@@ -805,17 +1102,18 @@ function loadProfile() {
                 renderPreview();
                 updateHandsetSettingsPreview();
                 loadAssetGallery();
+                showSuccess('Template loaded: ' + profiles[model].display_name);
             } catch (e) {
                 console.error('JSON parse error:', e);
-                alert('Error parsing template JSON: ' + e.message);
+                showError('Template Error', 'Error parsing template JSON', e.message);
             }
         } else {
             console.error('Template load failed:', r.message);
-            alert('Error loading model: ' + r.message);
+            showError('Load Failed', 'Error loading model template', r.message);
         }
     }, 'json').fail(function(xhr, status, error) {
         console.error('AJAX failed:', status, error);
-        alert('Failed to load template. Check console for details.');
+        handleAjaxError(xhr, status, error, 'Failed to load template.');
     });
 }
 
@@ -1230,29 +1528,40 @@ function generateProvPassword() {
 }
 
 function loadAssets() {
+    showLoading('Loading assets...');
     $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        hideLoading();
         if (r.status) {
             var html = '';
-            r.files.forEach(function(file) {
-                html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
-                html += '<div class="thumbnail">';
-                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
-                html += '<div class="caption">';
-                html += '<p style="font-size:11px; word-break:break-all;">' + file.filename + '</p>';
-                html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
-                html += '<button class="btn btn-xs btn-primary" onclick="selectAsset(\'' + file.filename + '\')">Select</button> ';
-                html += '<button class="btn btn-xs btn-danger" onclick="deleteAsset(\'' + file.filename + '\')">Delete</button>';
-                html += '</div></div></div>';
-            });
+            if (r.files.length === 0) {
+                html = '<div class="col-xs-12"><div class="alert alert-info"><i class="fa fa-info-circle"></i> No assets uploaded yet. Upload your first wallpaper or contact photo above.</div></div>';
+            } else {
+                r.files.forEach(function(file) {
+                    html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
+                    html += '<div class="thumbnail">';
+                    html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;" alt="' + file.filename + '">';
+                    html += '<div class="caption">';
+                    html += '<p style="font-size:11px; word-break:break-all;" title="' + file.filename + '">' + file.filename + '</p>';
+                    html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
+                    html += '<button class="btn btn-xs btn-primary" onclick="selectAsset(\'' + file.filename + '\')"><i class="fa fa-check"></i> Select</button> ';
+                    html += '<button class="btn btn-xs btn-danger" onclick="deleteAsset(\'' + file.filename + '\')"><i class="fa fa-trash"></i> Delete</button>';
+                    html += '</div></div></div>';
+                });
+            }
             $('#assetGrid').html(html);
+        } else {
+            showError('Load Failed', 'Failed to load assets');
         }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+        handleAjaxError(xhr, status, error, 'Failed to load assets.');
+    });
 }
 
 function selectAsset(filename) {
     $('#wallpaper').val(filename);
     updateWallpaperPreview(filename);
     renderPreview();
+    showSuccess('Wallpaper selected: ' + filename);
     $('a[href="#tab-edit"]').tab('show');
 }
 
@@ -1393,7 +1702,7 @@ $('#deviceForm').submit(function(e) {
     // Validate extension field
     var extension = $('#extension').val();
     if (!extension) {
-        alert('Please select or enter an extension');
+        showError('Validation Error', 'Please select or enter an extension');
         return;
     }
 
@@ -1412,12 +1721,14 @@ $('#deviceForm').submit(function(e) {
         });
         
         if (missingRequired.length > 0) {
-            alert('Please fill in the following required fields:\n\n• ' + missingRequired.join('\n• '));
+            showError('Required Fields Missing', 'Please fill in the following required fields:<br><br>• ' + missingRequired.join('<br>• '));
             return;
         }
     }
 
     // Prepare form data
+    showLoading('Saving device...');
+    
     // First, collect all form data
     var formData = $(this).serializeArray();
     
@@ -1436,18 +1747,24 @@ $('#deviceForm').submit(function(e) {
         action: 'save_device',
         data: serializedData,
         keys_json: JSON.stringify(currentKeys),
-        contacts_json: JSON.stringify(currentContacts)
+        contacts_json: JSON.stringify(currentContacts),
+        csrf_token: '<?= $csrf_token ?>'
     };
 
     $.post('ajax.quickprovisioner.php', data, function(r) {
+        hideLoading();
         if (r.status) {
-            alert('Saved!');
+            showSuccess('Device saved successfully!');
+            formChanged = false; // Reset change tracking after successful save
             loadDevices();
-            newDevice();
+            // Optionally stay on edit page or switch to list
+            // newDevice(); // Uncomment to reset form after save
         } else {
-            alert('Error: ' + r.message);
+            showError('Save Failed', r.message || 'Failed to save device');
         }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+        handleAjaxError(xhr, status, error, 'Failed to save device.');
+    });
 });
 
 // ========================================
