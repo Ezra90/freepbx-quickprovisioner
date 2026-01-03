@@ -1,5 +1,19 @@
 <?php
-// ajax.quickprovisioner.php - HH Quick Provisioner v2.1 - Backend API
+// ajax.quickprovisioner.php - HH Quick Provisioner v2.2 - Backend API
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
+
+// Block remote access to admin UI completely
+if (!qp_is_local_network()) {
+    die(json_encode(['status' => false, 'message' => 'Remote access denied. Admin UI is local network only.']));
+}
+
 if (!defined('FREEPBX_IS_AUTH') || !FREEPBX_IS_AUTH) {
     die(json_encode(['status' => false, 'message' => 'Unauthorized']));
 }
@@ -73,14 +87,16 @@ switch ($action) {
         $wallpaper = $form['wallpaper'] ?? '';
         $wallpaper_mode = $form['wallpaper_mode'] ?? 'crop';
         $security_pin = $form['security_pin'] ?? '';
+        $prov_username = $form['prov_username'] ?? '';
+        $prov_password = $form['prov_password'] ?? '';
 
         $id = $form['deviceId'] ?? null;
         if ($id) {
-            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=? WHERE id=?";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $id];
+            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=? WHERE id=?";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $id];
         } else {
-            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override];
+            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password];
         }
         $db->query($sql, $params);
         \FreePBX::create()->Logger->log("Device saved: MAC=" . $form['mac']);
@@ -329,7 +345,7 @@ switch ($action) {
         
         // Get current version from module.xml
         $module_xml_path = $module_dir . '/module.xml';
-        $current_version = '2.1.0'; // Default
+        $current_version = '2.2.0'; // Default
         if (file_exists($module_xml_path)) {
             $xml_content = @file_get_contents($module_xml_path);
             if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {

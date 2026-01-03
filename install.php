@@ -6,7 +6,7 @@
  * uninstallation, enabling, and disabling the Quick Provisioner module.
  * 
  * @package HH Quick Provisioner
- * @version 2.1.0
+ * @version 2.2.0
  * @license GPLv3
  */
 
@@ -36,6 +36,8 @@ function install() {
             `contacts_json` TEXT DEFAULT NULL COMMENT 'JSON data for contacts',
             `custom_options_json` TEXT DEFAULT NULL COMMENT 'JSON data for custom options',
             `custom_template_override` TEXT DEFAULT NULL COMMENT 'Custom template override',
+            `prov_username` VARCHAR(50) DEFAULT NULL COMMENT 'Provisioning auth username',
+            `prov_password` VARCHAR(100) DEFAULT NULL COMMENT 'Provisioning auth password',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -305,9 +307,36 @@ function uninstall_module() {
  * @return bool True on success, false on failure
  */
 function upgrade($oldversion, $newversion) {
+    global $db;
+    
     try {
         if (class_exists('FreePBX')) {
             FreePBX::create()->Logger->log("Quick Provisioner: Upgrading from $oldversion to $newversion");
+        }
+        
+        // Add provisioning auth columns if they don't exist (v2.2 upgrade)
+        try {
+            // Check if columns already exist
+            $columns = $db->query("SHOW COLUMNS FROM quickprovisioner_devices LIKE 'prov_username'")->fetchAll();
+            if (empty($columns)) {
+                $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN prov_username VARCHAR(50) DEFAULT NULL COMMENT 'Provisioning auth username'");
+                if (class_exists('FreePBX')) {
+                    FreePBX::create()->Logger->log("Quick Provisioner: Added prov_username column");
+                }
+            }
+            
+            $columns = $db->query("SHOW COLUMNS FROM quickprovisioner_devices LIKE 'prov_password'")->fetchAll();
+            if (empty($columns)) {
+                $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN prov_password VARCHAR(100) DEFAULT NULL COMMENT 'Provisioning auth password'");
+                if (class_exists('FreePBX')) {
+                    FreePBX::create()->Logger->log("Quick Provisioner: Added prov_password column");
+                }
+            }
+        } catch (Exception $e) {
+            // Columns may already exist, log but continue
+            if (class_exists('FreePBX')) {
+                FreePBX::create()->Logger->log("Quick Provisioner: Note - " . $e->getMessage());
+            }
         }
         
         // Run install_module to ensure directories and permissions are correct

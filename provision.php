@@ -1,5 +1,5 @@
 <?php
-// provision.php - HH Quick Provisioner v2.0 - Dynamic Engine
+// provision.php - HH Quick Provisioner v2.2 - Dynamic Engine
 include '/etc/freepbx.conf';
 
 $mac = isset($_GET['mac']) ? strtoupper(preg_replace('/[^A-F0-9]/', '', $_GET['mac'])) : null;
@@ -14,6 +14,29 @@ if (!$device) {
     \FreePBX::create()->Logger->log("Device not found for MAC: $mac");
     http_response_code(404);
     die("Device not found");
+}
+
+// Check for per-device provisioning authentication
+$prov_auth_required = false;
+$prov_authenticated = false;
+
+// First, check if device has provisioning credentials set
+if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
+    $prov_auth_required = true;
+    
+    // Check HTTP Basic Auth
+    if (isset($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['PHP_AUTH_PW'])) {
+        if ($_SERVER['PHP_AUTH_USER'] === $device['prov_username'] && 
+            $_SERVER['PHP_AUTH_PW'] === $device['prov_password']) {
+            $prov_authenticated = true;
+        }
+    }
+    
+    if (!$prov_authenticated) {
+        header('WWW-Authenticate: Basic realm="Device Provisioning"');
+        header('HTTP/1.0 401 Unauthorized');
+        die('Authentication required for provisioning');
+    }
 }
 
 $model = basename($device['model']); // Sanitize to prevent path traversal

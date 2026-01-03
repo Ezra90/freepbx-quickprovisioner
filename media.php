@@ -1,5 +1,5 @@
 <?php
-// media.php - HH Quick Provisioner v2.0.0 - Secure Resizer
+// media.php - HH Quick Provisioner v2.2 - Secure Resizer
 include '/etc/freepbx.conf';
 
 $authorized = false;
@@ -17,6 +17,18 @@ if (!$authorized && isset($_SERVER['PHP_AUTH_USER'])) {
     if ($device) {
         $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
         if ($pass === $secret) {
+            $authorized = true;
+        }
+    }
+}
+
+// Also check per-device provisioning credentials
+if (!$authorized && isset($_SERVER['PHP_AUTH_USER']) && $mac) {
+    global $db;
+    $prov_auth = $db->getRow("SELECT prov_username, prov_password FROM quickprovisioner_devices WHERE mac=?", [$mac]);
+    if ($prov_auth && !empty($prov_auth['prov_username']) && !empty($prov_auth['prov_password'])) {
+        if ($_SERVER['PHP_AUTH_USER'] === $prov_auth['prov_username'] && 
+            $_SERVER['PHP_AUTH_PW'] === $prov_auth['prov_password']) {
             $authorized = true;
         }
     }

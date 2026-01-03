@@ -1,4 +1,17 @@
 <?php
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
+
+if (!qp_is_local_network()) {
+    die('Remote access denied. Admin UI is local network only.');
+}
+
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 
 $devices = \FreePBX::Database()->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
@@ -18,7 +31,7 @@ if (!isset($_SESSION['qp_csrf'])) {
 $csrf_token = $_SESSION['qp_csrf'];
 ?>
 <div class="container-fluid">
-    <h1>HH Quick Provisioner v2.1.0</h1>
+    <h1>HH Quick Provisioner v2.2.0</h1>
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
@@ -81,6 +94,22 @@ $csrf_token = $_SESSION['qp_csrf'];
                         </div>
                         <div class="form-group"><label>Page</label>
                             <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
+                        </div>
+                        <hr>
+                        <h4>Provisioning Authentication</h4>
+                        <p class="text-muted">Credentials the handset will use to download its config remotely.</p>
+                        <div class="form-group">
+                            <label>Provisioning Username</label>
+                            <input type="text" id="prov_username" name="prov_username" class="form-control" placeholder="e.g. provision1001">
+                        </div>
+                        <div class="form-group">
+                            <label>Provisioning Password</label>
+                            <div class="input-group">
+                                <input type="text" id="prov_password" name="prov_password" class="form-control" placeholder="Leave blank to auto-generate">
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" onclick="generateProvPassword()">Generate</button>
+                                </span>
+                            </div>
                         </div>
                         <hr>
                         <div id="deviceOptions">
@@ -155,7 +184,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                 </div>
                 <div class="panel-body">
                     <div class="form-group">
-                        <strong>Current Version:</strong> <span id="currentVersion">2.1.0</span>
+                        <strong>Current Version:</strong> <span id="currentVersion">2.2.0</span>
                     </div>
                     <div class="form-group">
                         <strong>Git Commit:</strong> <span id="currentCommit">Loading...</span>
@@ -300,6 +329,8 @@ function editDevice(id) {
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
+            $('#prov_username').val(d.prov_username || '');
+            $('#prov_password').val(d.prov_password || '');
             currentKeys = JSON.parse(d.keys_json) || [];
             currentContacts = JSON.parse(d.contacts_json) || [];
             var custom_options = JSON.parse(d.custom_options_json) || {};
@@ -330,6 +361,8 @@ function newDevice() {
     $('#deviceForm')[0].reset();
     $('#deviceId').val('');
     $('#sip_secret_preview').val('');
+    $('#prov_username').val('');
+    $('#prov_password').val('');
     currentKeys = [];
     currentContacts = [];
     currentDeviceId = null;
@@ -603,6 +636,15 @@ function copyToClipboard(id) {
     }).catch(function() {
         alert('Copy failed.');
     });
+}
+
+function generateProvPassword() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    var password = '';
+    for (var i = 0; i < 16; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    $('#prov_password').val(password);
 }
 
 function uploadAsset() {
