@@ -369,12 +369,88 @@ switch ($action) {
         }
         $filename = uniqid('asset_') . '.' . $ext;
         $target = __DIR__ . '/assets/uploads/' . $filename;
-        $result = qp_safe_move_upload($_FILES['file']['tmp_name'], $target);
-        if ($result['status']) {
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded: $filename");
-            $response = ['status' => true, 'url' => $filename];
+        
+        // Auto-resize image if dimensions are provided
+        $resize_width = isset($_POST['resize_width']) ? intval($_POST['resize_width']) : 0;
+        $resize_height = isset($_POST['resize_height']) ? intval($_POST['resize_height']) : 0;
+        
+        if ($resize_width > 0 && $resize_height > 0 && function_exists('imagecreatefromjpeg')) {
+            // Load source image
+            $source = null;
+            switch ($mime) {
+                case 'image/jpeg':
+                    $source = @imagecreatefromjpeg($_FILES['file']['tmp_name']);
+                    break;
+                case 'image/png':
+                    $source = @imagecreatefrompng($_FILES['file']['tmp_name']);
+                    break;
+                case 'image/gif':
+                    $source = @imagecreatefromgif($_FILES['file']['tmp_name']);
+                    break;
+            }
+            
+            if ($source) {
+                $src_width = imagesx($source);
+                $src_height = imagesy($source);
+                
+                // Create destination image
+                $dest = imagecreatetruecolor($resize_width, $resize_height);
+                
+                // Preserve transparency for PNG/GIF
+                if ($mime === 'image/png' || $mime === 'image/gif') {
+                    imagealphablending($dest, false);
+                    imagesavealpha($dest, true);
+                    $transparent = imagecolorallocatealpha($dest, 0, 0, 0, 127);
+                    imagefilledrectangle($dest, 0, 0, $resize_width, $resize_height, $transparent);
+                }
+                
+                // Resize with resampling for better quality
+                imagecopyresampled($dest, $source, 0, 0, 0, 0, $resize_width, $resize_height, $src_width, $src_height);
+                
+                // Save resized image
+                $save_result = false;
+                switch ($ext) {
+                    case 'jpg':
+                    case 'jpeg':
+                        $save_result = imagejpeg($dest, $target, 90);
+                        break;
+                    case 'png':
+                        $save_result = imagepng($dest, $target, 9);
+                        break;
+                    case 'gif':
+                        $save_result = imagegif($dest, $target);
+                        break;
+                }
+                
+                imagedestroy($source);
+                imagedestroy($dest);
+                
+                if ($save_result) {
+                    chmod($target, 0644);
+                    \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded and resized: $filename");
+                    $response = ['status' => true, 'url' => $filename];
+                } else {
+                    $response['message'] = 'Failed to save resized image';
+                }
+            } else {
+                // Fallback to regular upload if image processing fails
+                $result = qp_safe_move_upload($_FILES['file']['tmp_name'], $target);
+                if ($result['status']) {
+                    \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded (resize failed, using original): $filename");
+                    $response = ['status' => true, 'url' => $filename];
+                } else {
+                    $response['message'] = $result['message'];
+                }
+            }
         } else {
-            $response['message'] = $result['message'];
+            // No resize requested or GD not available
+            $result = qp_safe_move_upload($_FILES['file']['tmp_name'], $target);
+            if ($result['status']) {
+                \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded: $filename");
+                $response = ['status' => true, 'url' => $filename];
+            } else {
+                $response['message'] = $result['message'];
+            }
         }
         break;
 

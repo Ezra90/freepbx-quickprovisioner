@@ -1587,6 +1587,18 @@ function uploadWallpaper() {
     fd.append('action', 'upload_file');
     fd.append('csrf_token', '<?= $csrf_token ?>');
     
+    // Get target dimensions from loaded profile
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.visual_editor) {
+        var width = profile.visual_editor.screen_width || 0;
+        var height = profile.visual_editor.screen_height || 0;
+        if (width > 0 && height > 0) {
+            fd.append('resize_width', width);
+            fd.append('resize_height', height);
+        }
+    }
+    
     $.ajax({
         url: 'ajax.quickprovisioner.php',
         type: 'POST',
