@@ -98,7 +98,7 @@ switch ($action) {
             $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password];
         }
         $db->query($sql, $params);
-        \FreePBX::create()->Logger->log("Device saved: MAC=" . $form['mac']);
+        \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Device saved: MAC=" . $form['mac']);
         $response = ['status' => true];
         break;
 
@@ -119,7 +119,7 @@ switch ($action) {
         if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
         $stmt = $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
         if ($stmt->rowCount() > 0) {
-            \FreePBX::create()->Logger->log("Device deleted: ID=$id");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Device deleted: ID=$id");
             $response = ['status' => true];
         } else {
             $response['message'] = 'Device not found';
@@ -252,7 +252,7 @@ switch ($action) {
         $target = __DIR__ . '/assets/uploads/' . $filename;
         $result = qp_safe_move_upload($_FILES['file']['tmp_name'], $target);
         if ($result['status']) {
-            \FreePBX::create()->Logger->log("Asset uploaded: $filename");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded: $filename");
             $response = ['status' => true, 'url' => $filename];
         } else {
             $response['message'] = $result['message'];
@@ -279,7 +279,7 @@ switch ($action) {
         $path = __DIR__ . '/assets/uploads/' . $filename;
         $result = qp_safe_delete($path);
         if ($result['status']) {
-            \FreePBX::create()->Logger->log("Asset deleted: $filename");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset deleted: $filename");
             $response = ['status' => true];
         } else {
             $response['message'] = $result['message'];
@@ -371,9 +371,9 @@ switch ($action) {
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
             putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
-            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
         
         // Fetch from origin
@@ -412,9 +412,9 @@ switch ($action) {
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
             putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
-            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
         
         // Get list of commits between current and remote
@@ -459,9 +459,9 @@ switch ($action) {
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
             putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
-            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
         
         // Perform git pull
@@ -488,20 +488,20 @@ switch ($action) {
             // Set ownership
             $chown_result = @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
             if ($chown_result !== null && strpos($chown_result, 'Operation not permitted') === false) {
-                \FreePBX::create()->Logger->log("Quick Provisioner: Ownership updated successfully");
+                \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Ownership updated successfully");
             } else {
-                \FreePBX::create()->Logger->log("Quick Provisioner: Unable to update ownership (may require elevated privileges)");
+                \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Unable to update ownership (may require elevated privileges)");
             }
             
             // Set directory permissions to 755
             $chmod_dir_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type d -exec chmod 755 {} \\; 2>&1");
-            \FreePBX::create()->Logger->log("Quick Provisioner: Directory permissions set to 755");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Directory permissions set to 755");
             
             // Set file permissions to 644
             $chmod_file_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
-            \FreePBX::create()->Logger->log("Quick Provisioner: File permissions set to 644");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: File permissions set to 644");
             
-            \FreePBX::create()->Logger->log("Module updated: $old_commit -> $new_commit");
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Module updated: $old_commit -> $new_commit");
             
             $response = [
                 'status' => true,

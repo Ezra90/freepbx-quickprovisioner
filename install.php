@@ -46,12 +46,12 @@ try {
     }
 
     if (class_exists('FreePBX')) {
-        FreePBX::create()->Logger->log("Quick Provisioner: Database table checked/created successfully");
+        FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Database table checked/created successfully");
     }
 
 } catch (Exception $e) {
     if (class_exists('FreePBX')) {
-        FreePBX::create()->Logger->log("Quick Provisioner Install Error: " . $e->getMessage());
+        FreePBX::create()->Logger->log(FPBX_LOG_ERROR, "Quick Provisioner Install Error: " . $e->getMessage());
     }
     error_log("Quick Provisioner Install Error: " . $e->getMessage());
 }
@@ -69,12 +69,12 @@ foreach ($directories as $dir) {
         if (!mkdir($dir, 0755, true)) {
             error_log("Quick Provisioner: Failed to create directory: $dir");
             if (class_exists('FreePBX')) {
-                FreePBX::create()->Logger->log("Quick Provisioner: Failed to create directory: $dir");
+                FreePBX::create()->Logger->log(FPBX_LOG_ERROR, "Quick Provisioner: Failed to create directory: $dir");
             }
             continue;
         }
         if (class_exists('FreePBX')) {
-            FreePBX::create()->Logger->log("Quick Provisioner: Created directory $dir");
+            FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Created directory $dir");
         }
     }
 }
@@ -111,12 +111,12 @@ if (is_dir($templates_dir)) {
         $htaccess_content .= "AddType text/plain .php .php3 .phtml .pht .json\n";
         @file_put_contents($htaccess_path, $htaccess_content);
         if (class_exists('FreePBX')) {
-            FreePBX::create()->Logger->log("Quick Provisioner: Created .htaccess for templates directory");
+            FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Created .htaccess for templates directory");
         }
     }
 }
 
 if (class_exists('FreePBX')) {
-    FreePBX::create()->Logger->log("Quick Provisioner: Module installation/check completed");
+    FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Module installation/check completed");
 }
 ?>
