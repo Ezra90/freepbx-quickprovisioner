@@ -315,6 +315,145 @@ switch ($action) {
             $response['message'] = 'Secret not found';
         }
         break;
+    
+    // === UPDATE MANAGEMENT ACTIONS ===
+    case 'check_updates':
+        $module_dir = __DIR__;
+        
+        // Get current commit hash
+        $current_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+        if (empty($current_commit) || strlen($current_commit) !== 40) {
+            $response['message'] = 'Failed to get current commit: ' . $current_commit;
+            break;
+        }
+        
+        // Get current version from module.xml
+        $module_xml_path = $module_dir . '/module.xml';
+        $current_version = '2.1.0'; // Default
+        if (file_exists($module_xml_path)) {
+            $xml_content = @file_get_contents($module_xml_path);
+            if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {
+                $current_version = $matches[1];
+            }
+        }
+        
+        // Set SSH key for git operations
+        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        
+        // Fetch from origin
+        $fetch_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git fetch origin main 2>&1");
+        
+        // Get remote commit hash
+        $remote_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse origin/main 2>&1"));
+        if (empty($remote_commit) || strlen($remote_commit) !== 40) {
+            $response['message'] = 'Failed to get remote commit. Fetch output: ' . $fetch_output;
+            break;
+        }
+        
+        // Check if updates are available
+        $has_updates = ($current_commit !== $remote_commit);
+        
+        $response = [
+            'status' => true,
+            'current_commit' => $current_commit,
+            'current_version' => $current_version,
+            'remote_commit' => $remote_commit,
+            'has_updates' => $has_updates
+        ];
+        break;
+    
+    case 'get_changelog':
+        $module_dir = __DIR__;
+        $current_commit = $_POST['current_commit'] ?? '';
+        $remote_commit = $_POST['remote_commit'] ?? '';
+        
+        if (empty($current_commit) || empty($remote_commit)) {
+            $response['message'] = 'Missing commit parameters';
+            break;
+        }
+        
+        // Set SSH key for git operations
+        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        
+        // Get list of commits between current and remote
+        $log_cmd = sprintf(
+            "cd %s && git log %s..%s --pretty=format:'%%H||%%s||%%an||%%ai' 2>&1",
+            escapeshellarg($module_dir),
+            escapeshellarg($current_commit),
+            escapeshellarg($remote_commit)
+        );
+        $log_output = shell_exec($log_cmd);
+        
+        $commits = [];
+        if (!empty($log_output)) {
+            $lines = explode("\n", trim($log_output));
+            foreach ($lines as $line) {
+                if (empty($line)) continue;
+                $parts = explode('||', $line);
+                if (count($parts) >= 4) {
+                    $commits[] = [
+                        'hash' => $parts[0],
+                        'message' => $parts[1],
+                        'author' => $parts[2],
+                        'date' => $parts[3]
+                    ];
+                }
+            }
+        }
+        
+        $response = [
+            'status' => true,
+            'commits' => $commits
+        ];
+        break;
+    
+    case 'perform_update':
+        $module_dir = __DIR__;
+        
+        // Get current commit before update
+        $old_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+        
+        // Set SSH key for git operations
+        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        
+        // Perform git pull
+        $pull_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git pull origin main 2>&1");
+        
+        // Check if pull was successful
+        if (strpos($pull_output, 'Already up to date') !== false || strpos($pull_output, 'Fast-forward') !== false || strpos($pull_output, 'Updating') !== false) {
+            // Get new commit hash
+            $new_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+            
+            // Get new version from module.xml
+            $module_xml_path = $module_dir . '/module.xml';
+            $new_version = null;
+            if (file_exists($module_xml_path)) {
+                $xml_content = @file_get_contents($module_xml_path);
+                if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {
+                    $new_version = $matches[1];
+                }
+            }
+            
+            // Fix permissions
+            // Note: These commands may require sudo privileges that might not be available
+            // Using @ to suppress errors if they fail
+            @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
+            @shell_exec("chmod -R 755 " . escapeshellarg($module_dir) . " 2>&1");
+            @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
+            
+            \FreePBX::create()->Logger->log("Module updated: $old_commit -> $new_commit");
+            
+            $response = [
+                'status' => true,
+                'old_commit' => $old_commit,
+                'new_commit' => $new_commit,
+                'new_version' => $new_version,
+                'message' => 'Update completed successfully. Please refresh the page to see changes.'
+            ];
+        } else {
+            $response['message'] = 'Git pull failed: ' . $pull_output;
+        }
+        break;
 }
 
 echo json_encode($response);
