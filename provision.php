@@ -76,7 +76,7 @@ $template = $device['custom_template_override'] ? $device['custom_template_overr
 $template = preg_replace_callback('/{{if (.*?)}}(.*?){{\/if}}/s', function($m) use ($vars) {
     $var = trim($m[1]);
     $content = $m[2];
-    if (isset($vars[$var]) && $vars[$var]) {
+    if (isset($vars['{{' . $var . '}}']) && $vars['{{' . $var . '}}']) {
         return $content;
     }
     return '';
