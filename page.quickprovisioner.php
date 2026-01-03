@@ -49,7 +49,7 @@ $csrf_token = $_SESSION['qp_csrf'];
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
-        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Device</a></li>
+        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Provisioning</a></li>
         <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
         <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
         <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
@@ -73,7 +73,9 @@ $csrf_token = $_SESSION['qp_csrf'];
                 <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
                 <input type="hidden" id="extension" name="extension">
                 <div class="row">
+                    <!-- LEFT COLUMN: Core Settings (Always Visible ~30-35%) -->
                     <div class="col-md-4">
+                        <h4>Core Device Settings</h4>
                         <div class="form-group">
                             <label>Extension Number</label>
                             <div id="extension_select_wrapper">
@@ -103,6 +105,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                             </div>
                             <small class="text-muted">Select from FreePBX extensions or enter a custom value</small>
                         </div>
+                        
                         <div class="form-group">
                             <label>SIP Secret</label>
                             <input type="hidden" id="custom_sip_secret" name="custom_sip_secret">
@@ -134,21 +137,26 @@ $csrf_token = $_SESSION['qp_csrf'];
                             </div>
                             <small class="text-muted">Auto-fetched from FreePBX or enter custom secret (will be saved and used in provisioning)</small>
                         </div>
-                        <hr>
-                        <div class="form-group"><label>Model</label>
-                            <select id="model" class="form-control" onchange="loadProfile(); updatePageSelect(); renderPreview(); showModelNotes(); loadDeviceOptions();">
+                        
+                        <div class="form-group">
+                            <label>Model</label>
+                            <select id="model" class="form-control" onchange="loadProfile(); updateTemplateHeader(); renderHandsetSettings(); renderPhoneAssets(); renderButtonLayout();">
                                 <!-- Populated by loadTemplates() -->
                             </select>
                         </div>
-                        <div id="modelNotes" style="margin-bottom:15px; color:#666;"></div>
+                        
+                        <div class="form-group">
+                            <label>MAC Address</label>
+                            <input type="text" id="mac" class="form-control" required>
+                        </div>
+                        
                         <hr>
-                        <div class="form-group"><label>MAC Address</label><input type="text" id="mac" class="form-control" required></div>
-                        <hr>
-                        <h4>Remote Provisioning Authentication</h4>
+                        
+                        <h5>Remote Provisioning Authentication</h5>
                         <div class="form-group">
                             <label>Provisioning Username</label>
                             <input type="text" id="prov_username" class="form-control" placeholder="Required for remote provisioning">
-                            <small class="text-muted">Remote provisioning requires per-device credentials. Devices must send HTTP Basic Auth when retrieving configs or media.</small>
+                            <small class="text-muted">HTTP Basic Auth for remote provisioning</small>
                         </div>
                         <div class="form-group">
                             <label>Provisioning Password</label>
@@ -159,50 +167,82 @@ $csrf_token = $_SESSION['qp_csrf'];
                                 </span>
                             </div>
                         </div>
+                        
                         <hr>
-                        <div class="form-group"><label>Wallpaper</label>
-                            <div class="input-group">
-                                <input type="text" id="wallpaper" class="form-control" readonly placeholder="Click Pick to select" onchange="renderPreview()">
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button>
-                                    <button type="button" class="btn btn-default" onclick="clearWallpaper()" title="Clear wallpaper">
-                                        <i class="fa fa-times"></i>
-                                    </button>
-                                </span>
+                        
+                        <div class="panel-group" id="advancedAccordion">
+                            <div class="panel panel-default">
+                                <div class="panel-heading">
+                                    <h4 class="panel-title">
+                                        <a data-toggle="collapse" data-parent="#advancedAccordion" href="#collapseAdvanced">
+                                            Advanced: Custom Template Override <i class="fa fa-chevron-down"></i>
+                                        </a>
+                                    </h4>
+                                </div>
+                                <div id="collapseAdvanced" class="panel-collapse collapse">
+                                    <div class="panel-body">
+                                        <textarea id="custom_template_override" class="form-control" rows="8" placeholder="Paste custom template here to override default..."></textarea>
+                                        <p class="text-warning" style="margin-top:10px;">⚠️ Warning: This overrides the model template entirely. Use with caution.</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div id="wallpaperPreview" style="margin-top:10px; display:none;">
-                                <img id="wallpaperPreviewImg" style="max-width:200px; max-height:150px; border:1px solid #ccc; border-radius:4px;">
-                            </div>
                         </div>
-                        <div class="form-group"><label>Wallpaper Mode</label>
-                            <select id="wallpaper_mode" class="form-control" onchange="renderPreview()">
-                                <option value="crop">Crop to Fill (recommended)</option>
-                                <option value="fit">Fit (Letterbox - may show black bars)</option>
-                            </select>
-                            <small class="help-block text-muted">Crop mode fills the entire screen by cropping edges. Fit mode shows the entire image with possible black bars.</small>
-                        </div>
-                        <div class="form-group"><label>Page</label>
-                            <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
-                        </div>
+                        
                         <hr>
-                        <div id="deviceOptions">
-                            <h4>Device Options</h4>
-                        </div>
-                        <hr>
-                        <div id="advancedOptions">
-                            <h4>Advanced: Custom Template Override</h4>
-                            <textarea id="custom_template_override" class="form-control" rows="10" placeholder="Paste custom template here to override default..."></textarea>
-                            <p class="text-warning">Warning: This overrides the model template entirely. Use with caution.</p>
-                        </div>
-                        <button type="submit" class="btn btn-success btn-block">Save Device</button>
-                        <button type="button" class="btn btn-info btn-block" onclick="previewConfig()">Preview Provisioning Config</button>
+                        
+                        <button type="submit" class="btn btn-success btn-block" style="margin-bottom:10px;">
+                            <i class="fa fa-save"></i> Save Device
+                        </button>
+                        <button type="button" class="btn btn-info btn-block" onclick="previewConfig()" style="margin-bottom:10px;">
+                            <i class="fa fa-eye"></i> Preview Provisioning Config
+                        </button>
+                        <button type="button" class="btn btn-primary btn-block" onclick="generateProvisioningFile()" style="font-weight:bold;">
+                            <i class="fa fa-file-text-o"></i> Generate Provisioning File
+                        </button>
                     </div>
+                    
+                    <!-- RIGHT COLUMN: Template-Driven Content (~65-70%) -->
                     <div class="col-md-8">
                         <div class="panel panel-default">
-                            <div class="panel-heading">Live Visual Preview</div>
+                            <div class="panel-heading">
+                                <h4 id="templateHeader" style="margin:0;">Select a model to load template settings</h4>
+                            </div>
                             <div class="panel-body">
-                                <div id="previewContainer" style="position:relative; margin:0 auto; border:1px solid #ccc;">
-                                    <div id="keysLayer"></div>
+                                <!-- Sub-tabs -->
+                                <ul class="nav nav-tabs" role="tablist" id="rightColumnTabs">
+                                    <li class="active"><a data-toggle="tab" href="#subtab-handset">Handset Settings</a></li>
+                                    <li><a data-toggle="tab" href="#subtab-assets">Phone Assets</a></li>
+                                    <li><a data-toggle="tab" href="#subtab-layout">Button Layout</a></li>
+                                </ul>
+                                
+                                <div class="tab-content" style="padding-top:15px;">
+                                    <!-- Sub-tab 1: Handset Settings -->
+                                    <div id="subtab-handset" class="tab-pane fade in active">
+                                        <div id="handsetSettingsContent">
+                                            <p class="text-muted">Select a model to view handset settings.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sub-tab 2: Phone Assets -->
+                                    <div id="subtab-assets" class="tab-pane fade">
+                                        <div id="phoneAssetsContent">
+                                            <p class="text-muted">Select a model to manage phone assets.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sub-tab 3: Button Layout -->
+                                    <div id="subtab-layout" class="tab-pane fade">
+                                        <div id="buttonLayoutContent">
+                                            <div class="form-group">
+                                                <label>Page</label>
+                                                <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
+                                            </div>
+                                            <div id="previewContainer" style="position:relative; margin:0 auto; border:1px solid #ccc;">
+                                                <div id="keysLayer"></div>
+                                            </div>
+                                            <p class="text-muted" style="margin-top:10px;">Click any button to configure (Type, Value, Label)</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -371,6 +411,36 @@ $csrf_token = $_SESSION['qp_csrf'];
       </div>
       <div class="modal-footer">
         <button class="btn btn-default" onclick="$('#configPreviewModal').modal('hide')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="generateModal">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4>Generated Provisioning File</h4>
+      </div>
+      <div class="modal-body">
+        <p><strong>Filename:</strong> <span id="generatedFilename"></span></p>
+        <textarea id="generatedConfig" class="form-control" rows="15" readonly style="font-family: monospace;"></textarea>
+        <p class="text-muted" style="margin-top:10px;">
+          <strong>Deploy path:</strong> <span id="deployPath">/var/www/html/provisioning/<span id="deployFilename"></span></span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" onclick="downloadConfig()">
+          <i class="fa fa-download"></i> Download .cfg
+        </button>
+        <button class="btn btn-primary" onclick="deployConfig()">
+          <i class="fa fa-upload"></i> Deploy to Server
+        </button>
+        <button class="btn btn-default" onclick="copyGeneratedToClipboard()">
+          <i class="fa fa-copy"></i> Copy to Clipboard
+        </button>
+        <button class="btn btn-default" data-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -794,12 +864,14 @@ function extensionSelectChanged() {
     var ext = $('#extension_select').val();
     $('#extension').val(ext);
     loadSipSecret();
+    updateAccountSetupPreview();
 }
 
 function loadSipSecret() {
     var ext = $('#extension').val();
     if (!ext) {
         $('#sip_secret_preview').val('');
+        updateAccountSetupPreview();
         return;
     }
 
@@ -807,6 +879,7 @@ function loadSipSecret() {
     var customSecret = $('#custom_sip_secret').val();
     if (customSecret) {
         $('#sip_secret_preview').val(customSecret + ' (Custom)');
+        updateAccountSetupPreview();
         return;
     }
 
@@ -821,6 +894,7 @@ function loadSipSecret() {
         } else {
             $('#sip_secret_preview').val('Error: ' + r.message);
         }
+        updateAccountSetupPreview();
     }, 'json');
 }
 
@@ -849,6 +923,7 @@ function customExtensionChanged() {
     $('#extension').val(ext);
     // Clear secret when custom extension is changed
     $('#sip_secret_preview').val('');
+    updateAccountSetupPreview();
 }
 
 function toggleCustomSecret() {
@@ -895,6 +970,7 @@ function saveCustomSecret() {
     $('#secret_custom_wrapper').hide();
     $('#secret_preview_wrapper').show();
 
+    updateAccountSetupPreview();
     alert('Custom secret saved. Click "Save Device" to persist to database.');
 }
 
@@ -1334,6 +1410,406 @@ $(document).ready(function() {
         }
     }, 'json');
 });
+
+// === NEW FUNCTIONS FOR UI RESTRUCTURE ===
+
+// Update template header when model is loaded
+function updateTemplateHeader() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (!model) {
+        $('#templateHeader').text('Select a model to load template settings');
+        return;
+    }
+    if (profile && profile.display_name) {
+        $('#templateHeader').html('<i class="fa fa-check-circle text-success"></i> ' + profile.display_name + ' Template Loaded');
+    } else {
+        $('#templateHeader').text('Loading template...');
+    }
+}
+
+// Render Handset Settings tab
+function renderHandsetSettings() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (!profile) {
+        $('#handsetSettingsContent').html('<p class="text-muted">Select a model to view handset settings.</p>');
+        return;
+    }
+    
+    var html = '';
+    
+    // Section 1: Auto Provisioning
+    html += '<h4>1. Auto Provisioning</h4>';
+    html += '<div class="well">';
+    html += '<div class="form-group">';
+    html += '<label>Auto Provisioning Server URL</label>';
+    html += '<input type="text" class="form-control" id="auto_prov_url" placeholder="http://voiphillhotel.duckdns.org">';
+    html += '<small class="text-muted">Pre-filled from FreePBX domain, editable</small>';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>auto_provision.mode</label>';
+    html += '<select class="form-control" id="auto_prov_mode">';
+    html += '<option value="0">0 - Disabled</option>';
+    html += '<option value="1">1 - Power on only</option>';
+    html += '<option value="2">2 - Repeatedly</option>';
+    html += '<option value="3">3 - Power on + Repeatedly</option>';
+    html += '</select>';
+    html += '<small class="text-muted">Select provisioning mode for the device</small>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Section 2: Account Setup (Live Preview)
+    html += '<h4>2. Account Setup (Live Preview)</h4>';
+    html += '<div class="well" style="background:#f9f9f9;">';
+    html += '<pre id="accountSetupPreview" style="background:white; padding:10px; border:1px solid #ddd;">Loading...</pre>';
+    html += '<small class="text-muted">Updates live as you change left column values</small>';
+    html += '</div>';
+    
+    // Section 3: SIP Server
+    html += '<h4>3. SIP Server Configuration</h4>';
+    html += '<div class="well">';
+    html += '<div class="form-group">';
+    html += '<label>account.1.sip_server.1.address</label>';
+    html += '<input type="text" class="form-control" id="sip_server_address" placeholder="voiphillhotel.duckdns.org">';
+    html += '<small class="text-muted">Suggest FreePBX domain</small>';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>account.1.sip_server.1.port</label>';
+    html += '<input type="number" class="form-control" id="sip_server_port" value="5060">';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>account.1.sip_server.1.transport_type</label>';
+    html += '<select class="form-control" id="sip_transport_type">';
+    html += '<option value="0">0 - UDP</option>';
+    html += '<option value="1">1 - TCP</option>';
+    html += '<option value="2">2 - TLS</option>';
+    html += '</select>';
+    html += '</div>';
+    html += '<small class="text-muted">Can customize for remote scenarios using different port/server</small>';
+    html += '</div>';
+    
+    // Section 4: Template Configurable Options
+    if (profile.configurable_options && profile.configurable_options.length > 0) {
+        html += '<h4>4. Template Configurable Options</h4>';
+        html += '<div class="well">';
+        html += '<div id="deviceOptions">';
+        profile.configurable_options.forEach(function(opt) {
+            html += '<div class="form-group">';
+            html += '<label title="' + (opt.description || '') + '">';
+            html += opt.label;
+            if (opt.required) {
+                html += ' <span class="text-danger">*</span>';
+            }
+            html += '</label>';
+            
+            if (opt.type === 'bool') {
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
+                html += '<option value="1">On</option>';
+                html += '<option value="0">Off</option>';
+                html += '</select>';
+            } else if (opt.type === 'select') {
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
+                for (var val in opt.options) {
+                    html += '<option value="' + val + '">' + opt.options[val] + '</option>';
+                }
+                html += '</select>';
+            } else if (opt.type === 'number') {
+                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+            } else {
+                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+            }
+            
+            if (opt.description) {
+                html += '<small class="help-block text-muted">' + opt.description + '</small>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    $('#handsetSettingsContent').html(html);
+    updateAccountSetupPreview();
+}
+
+// Update Account Setup Live Preview
+function updateAccountSetupPreview() {
+    var ext = $('#extension').val();
+    var secret = $('#sip_secret_preview').val();
+    var displayName = ext; // Can be enhanced to fetch actual display name
+    
+    var preview = 'account.1.enable = 1\n';
+    preview += 'account.1.label = ' + displayName + '\n';
+    preview += 'account.1.display_name = ' + displayName + '\n';
+    preview += 'account.1.auth_name = ' + ext + '\n';
+    preview += 'account.1.user_name = ' + ext + '\n';
+    preview += 'account.1.password = ' + (secret ? secret.replace(' (Custom)', '') : '[Not set]');
+    
+    $('#accountSetupPreview').text(preview);
+}
+
+// Render Phone Assets tab
+function renderPhoneAssets() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (!profile) {
+        $('#phoneAssetsContent').html('<p class="text-muted">Select a model to manage phone assets.</p>');
+        return;
+    }
+    
+    var screenWidth = profile.visual_editor?.screen_width || 800;
+    var screenHeight = profile.visual_editor?.screen_height || 480;
+    
+    var html = '';
+    
+    // Upload Section
+    html += '<h4>Upload Wallpaper</h4>';
+    html += '<div class="well">';
+    html += '<div style="border:2px dashed #ddd; padding:30px; text-align:center; background:#f9f9f9; margin-bottom:15px;">';
+    html += '<i class="fa fa-upload" style="font-size:48px; color:#999;"></i>';
+    html += '<p style="margin-top:10px;">Drag & Drop or Click to Upload</p>';
+    html += '<p class="text-muted">Target dimensions: ' + screenWidth + ' x ' + screenHeight + '</p>';
+    html += '<p class="text-muted">Supported formats: JPG, PNG | Max file size: 5MB</p>';
+    html += '<label class="btn btn-default">';
+    html += '<input type="file" id="wallpaperUploadInput" accept="image/jpeg,image/png" style="display:none;">';
+    html += '<i class="fa fa-folder-open"></i> Choose File';
+    html += '</label>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Current Wallpaper Display
+    html += '<h4>Current Wallpaper</h4>';
+    html += '<div class="well">';
+    html += '<div class="form-group">';
+    html += '<label>Wallpaper</label>';
+    html += '<div class="input-group">';
+    html += '<input type="text" id="wallpaper" name="wallpaper" class="form-control" readonly placeholder="No wallpaper selected">';
+    html += '<span class="input-group-btn">';
+    html += '<button type="button" class="btn btn-default" onclick="clearWallpaper()" title="Clear wallpaper">';
+    html += '<i class="fa fa-times"></i>';
+    html += '</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '<div id="wallpaperPreview" style="margin-top:10px; display:none;">';
+    html += '<img id="wallpaperPreviewImg" style="max-width:100%; max-height:200px; border:1px solid #ccc; border-radius:4px;">';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="form-group">';
+    html += '<label>Wallpaper Mode</label>';
+    html += '<select id="wallpaper_mode" name="wallpaper_mode" class="form-control" onchange="renderPreview()">';
+    html += '<option value="crop">Crop to Fill (recommended)</option>';
+    html += '<option value="fit">Fit (Letterbox - may show black bars)</option>';
+    html += '</select>';
+    html += '<small class="text-muted">Crop mode fills the entire screen by cropping edges</small>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Custom URL Option
+    html += '<h4>Or Use Custom URL</h4>';
+    html += '<div class="well">';
+    html += '<div class="input-group">';
+    html += '<input type="text" class="form-control" id="wallpaper_custom_url" placeholder="http://example.com/wallpaper.jpg">';
+    html += '<span class="input-group-btn">';
+    html += '<button class="btn btn-primary" onclick="useCustomWallpaperUrl()">Use URL</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Asset Gallery
+    html += '<h4>Available Assets</h4>';
+    html += '<div id="assetGallery" class="row"></div>';
+    
+    $('#phoneAssetsContent').html(html);
+    
+    // Load assets into gallery
+    loadAssetsIntoGallery();
+    
+    // Setup file upload handler
+    $('#wallpaperUploadInput').on('change', function() {
+        uploadWallpaperAsset();
+    });
+}
+
+// Load assets into gallery
+function loadAssetsIntoGallery() {
+    $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            var html = '';
+            r.files.forEach(function(file) {
+                html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
+                html += '<div class="thumbnail">';
+                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
+                html += '<div class="caption">';
+                html += '<p style="font-size:11px; word-break:break-all; margin-bottom:5px;">' + file.filename + '</p>';
+                html += '<p style="font-size:10px; color:#666; margin-bottom:10px;">' + formatFileSize(file.size) + '</p>';
+                html += '<button class="btn btn-xs btn-primary btn-block" onclick="selectAssetForWallpaper(\'' + file.filename + '\')">Select</button>';
+                html += '</div></div></div>';
+            });
+            $('#assetGallery').html(html || '<p class="text-muted col-xs-12">No assets uploaded yet.</p>');
+        }
+    }, 'json');
+}
+
+// Select asset for wallpaper
+function selectAssetForWallpaper(filename) {
+    $('#wallpaper').val(filename);
+    updateWallpaperPreview(filename);
+    renderPreview();
+    // Switch to Button Layout tab to see the preview
+    $('a[href="#subtab-layout"]').tab('show');
+}
+
+// Use custom wallpaper URL
+function useCustomWallpaperUrl() {
+    var url = $('#wallpaper_custom_url').val().trim();
+    if (!url) {
+        alert('Please enter a URL');
+        return;
+    }
+    $('#wallpaper').val(url);
+    updateWallpaperPreview(url);
+    renderPreview();
+    $('a[href="#subtab-layout"]').tab('show');
+}
+
+// Upload wallpaper asset
+function uploadWallpaperAsset() {
+    var file = $('#wallpaperUploadInput')[0].files[0];
+    if (!file) return;
+    
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('action', 'upload_file');
+    fd.append('csrf_token', '<?= $csrf_token ?>');
+    
+    $.ajax({
+        url: 'ajax.quickprovisioner.php',
+        type: 'POST',
+        data: fd,
+        contentType: false,
+        processData: false,
+        success: function(r) {
+            if (r.status) {
+                alert('Asset uploaded successfully!');
+                selectAssetForWallpaper(r.url);
+                loadAssetsIntoGallery();
+            } else {
+                alert('Error: ' + r.message);
+            }
+        }
+    });
+}
+
+// Render Button Layout tab
+function renderButtonLayout() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (!profile) {
+        $('#buttonLayoutContent').html('<p class="text-muted">Select a model to view button layout.</p>');
+        return;
+    }
+    
+    updatePageSelect();
+    renderPreview();
+}
+
+// Generate Provisioning File
+function generateProvisioningFile() {
+    if (!currentDeviceId) {
+        alert('Please save the device first before generating provisioning file.');
+        return;
+    }
+    
+    // Show loading state
+    var btn = $('button[onclick="generateProvisioningFile()"]');
+    var originalText = btn.html();
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Generating...');
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'generate_config',
+        id: currentDeviceId,
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        btn.prop('disabled', false).html(originalText);
+        
+        if (r.status) {
+            $('#generatedConfig').val(r.config);
+            $('#generatedFilename').text(r.filename);
+            $('#deployFilename').text(r.filename);
+            $('#generateModal').modal('show');
+        } else {
+            alert('Error generating config: ' + (r.message || 'Unknown error'));
+        }
+    }, 'json').fail(function() {
+        btn.prop('disabled', false).html(originalText);
+        alert('Failed to generate config. Please try again.');
+    });
+}
+
+// Download Config
+function downloadConfig() {
+    var config = $('#generatedConfig').val();
+    var filename = $('#generatedFilename').text();
+    var blob = new Blob([config], {type: 'text/plain'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Deploy Config
+function deployConfig() {
+    if (!confirm('Deploy this configuration to the server?')) return;
+    
+    var btn = $('button[onclick="deployConfig()"]');
+    var originalText = btn.html();
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Deploying...');
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'deploy_config',
+        id: currentDeviceId,
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        btn.prop('disabled', false).html(originalText);
+        
+        if (r.status) {
+            alert('Config deployed successfully to:\n' + r.path);
+            $('#deployPath').text(r.path);
+        } else {
+            alert('Error deploying config: ' + (r.message || 'Unknown error'));
+        }
+    }, 'json').fail(function() {
+        btn.prop('disabled', false).html(originalText);
+        alert('Failed to deploy config. Please try again.');
+    });
+}
+
+// Copy Generated Config to Clipboard
+function copyGeneratedToClipboard() {
+    var text = $('#generatedConfig').val();
+    if (!text) {
+        alert('No config to copy.');
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Config copied to clipboard!');
+        }).catch(function(err) {
+            fallbackCopyToClipboard(text);
+        });
+    } else {
+        fallbackCopyToClipboard(text);
+    }
+}
+
 </script>
 <?php
 ?>
