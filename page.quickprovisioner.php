@@ -1,4 +1,17 @@
 <?php
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
+
+if (!qp_is_local_network()) {
+    die('Remote access denied. Admin UI is local network only.');
+}
+
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 
 $devices = \FreePBX::Database()->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
@@ -18,7 +31,7 @@ if (!isset($_SESSION['qp_csrf'])) {
 $csrf_token = $_SESSION['qp_csrf'];
 ?>
 <div class="container-fluid">
-    <h1>HH Quick Provisioner v2.1.0</h1>
+    <h1>HH Quick Provisioner v2.2.0</h1>
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
@@ -60,6 +73,23 @@ $csrf_token = $_SESSION['qp_csrf'];
                             <button type="button" class="btn btn-sm btn-default" onclick="copyToClipboard('sip_secret_preview')">Copy</button>
                             <small class="text-muted">Unmasked for admin verification. Only visible to logged-in users.</small>
                         </div>
+                        <hr>
+                        <h4>Remote Provisioning Authentication</h4>
+                        <div class="form-group">
+                            <label>Provisioning Username</label>
+                            <input type="text" id="prov_username" class="form-control" placeholder="Optional: For remote provisioning auth">
+                            <small class="text-muted">Leave empty to disable auth from remote networks</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Provisioning Password</label>
+                            <div class="input-group">
+                                <input type="text" id="prov_password" class="form-control" placeholder="Optional: For remote provisioning auth">
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" onclick="generateProvPassword()">Generate</button>
+                                </span>
+                            </div>
+                        </div>
+                        <hr>
                         <div class="form-group"><label>Model</label>
                             <select id="model" class="form-control" onchange="loadProfile(); updatePageSelect(); renderPreview(); showModelNotes(); loadDeviceOptions();">
                                 <!-- Populated by loadTemplates() -->
@@ -155,7 +185,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                 </div>
                 <div class="panel-body">
                     <div class="form-group">
-                        <strong>Current Version:</strong> <span id="currentVersion">2.1.0</span>
+                        <strong>Current Version:</strong> <span id="currentVersion">2.2.0</span>
                     </div>
                     <div class="form-group">
                         <strong>Git Commit:</strong> <span id="currentCommit">Loading...</span>
@@ -300,6 +330,8 @@ function editDevice(id) {
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
+            $('#prov_username').val(d.prov_username || '');
+            $('#prov_password').val(d.prov_password || '');
             currentKeys = JSON.parse(d.keys_json) || [];
             currentContacts = JSON.parse(d.contacts_json) || [];
             var custom_options = JSON.parse(d.custom_options_json) || {};
@@ -330,6 +362,8 @@ function newDevice() {
     $('#deviceForm')[0].reset();
     $('#deviceId').val('');
     $('#sip_secret_preview').val('');
+    $('#prov_username').val('');
+    $('#prov_password').val('');
     currentKeys = [];
     currentContacts = [];
     currentDeviceId = null;
@@ -603,6 +637,126 @@ function copyToClipboard(id) {
     }).catch(function() {
         alert('Copy failed.');
     });
+}
+
+function generateProvPassword() {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    var password = '';
+    for (var i = 0; i < 16; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    $('#prov_password').val(password);
+}
+
+function loadAssets() {
+    $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            var html = '';
+            r.files.forEach(function(file) {
+                html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
+                html += '<div class="thumbnail">';
+                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
+                html += '<div class="caption">';
+                html += '<p style="font-size:11px; word-break:break-all;">' + file.filename + '</p>';
+                html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
+                html += '<button class="btn btn-xs btn-primary" onclick="selectAsset(\'' + file.filename + '\')">Select</button> ';
+                html += '<button class="btn btn-xs btn-danger" onclick="deleteAsset(\'' + file.filename + '\')">Delete</button>';
+                html += '</div></div></div>';
+            });
+            $('#assetGrid').html(html);
+        }
+    }, 'json');
+}
+
+function selectAsset(filename) {
+    $('#wallpaper').val(filename);
+    renderPreview();
+    $('a[href="#tab-edit"]').tab('show');
+}
+
+function deleteAsset(filename) {
+    if (!confirm('Delete ' + filename + '?')) return;
+    $.post('ajax.quickprovisioner.php', {action: 'delete_asset', filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            loadAssets();
+        } else {
+            alert('Error: ' + r.message);
+        }
+    }, 'json');
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function loadContacts() {
+    if (!currentDeviceId) {
+        $('#contactsList').html('<p>Please save device first.</p>');
+        return;
+    }
+    var html = '<table class="table table-striped"><thead><tr><th>Name</th><th>Number</th><th>Photo</th><th>Actions</th></tr></thead><tbody>';
+    currentContacts.forEach(function(c, idx) {
+        html += '<tr>';
+        html += '<td>' + (c.name || '') + '</td>';
+        html += '<td>' + (c.number || '') + '</td>';
+        html += '<td>' + (c.photo ? '<img src="assets/uploads/' + c.photo + '" style="width:50px; height:50px; object-fit:cover;">' : 'None') + '</td>';
+        html += '<td><button onclick="editContact(' + idx + ')">Edit</button> <button onclick="removeContact(' + idx + ')">Delete</button></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    $('#contactsList').html(html);
+}
+
+function addContact() {
+    $('#contactIndex').text(currentContacts.length);
+    $('#contactName').val('');
+    $('#contactNumber').val('');
+    $('#contactLabel').val('');
+    $('#contactPhoto').val('');
+    $('#contactModal').modal('show');
+}
+
+function editContact(idx) {
+    $('#contactIndex').text(idx);
+    var c = currentContacts[idx] || {};
+    $('#contactName').val(c.name || '');
+    $('#contactNumber').val(c.number || '');
+    $('#contactLabel').val(c.custom_label || '');
+    $('#contactPhoto').val(c.photo || '');
+    $('#contactModal').modal('show');
+}
+
+function saveContact() {
+    var idx = parseInt($('#contactIndex').text());
+    var contact = {
+        name: $('#contactName').val(),
+        number: $('#contactNumber').val(),
+        custom_label: $('#contactLabel').val(),
+        photo: $('#contactPhoto').val()
+    };
+    if (idx < currentContacts.length) {
+        currentContacts[idx] = contact;
+    } else {
+        currentContacts.push(contact);
+    }
+    loadContacts();
+    $('#contactModal').modal('hide');
+}
+
+function removeContact(idx) {
+    if (confirm('Remove this contact?')) {
+        currentContacts.splice(idx, 1);
+        loadContacts();
+    }
+}
+
+function clearContact() {
+    $('#contactName').val('');
+    $('#contactNumber').val('');
+    $('#contactLabel').val('');
+    $('#contactPhoto').val('');
 }
 
 function uploadAsset() {

@@ -1,6 +1,15 @@
 <?php
-// provision.php - HH Quick Provisioner v2.0 - Dynamic Engine
+// provision.php - HH Quick Provisioner v2.2 - Dynamic Engine
 include '/etc/freepbx.conf';
+
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
 
 $mac = isset($_GET['mac']) ? strtoupper(preg_replace('/[^A-F0-9]/', '', $_GET['mac'])) : null;
 if (!$mac || strlen($mac) < 12) {
@@ -14,6 +23,24 @@ if (!$device) {
     \FreePBX::create()->Logger->log("Device not found for MAC: $mac");
     http_response_code(404);
     die("Device not found");
+}
+
+// Check authentication for remote access
+if (!qp_is_local_network()) {
+    $prov_user = $device['prov_username'] ?? '';
+    $prov_pass = $device['prov_password'] ?? '';
+    
+    if (!empty($prov_user) && !empty($prov_pass)) {
+        $auth_user = $_SERVER['PHP_AUTH_USER'] ?? '';
+        $auth_pass = $_SERVER['PHP_AUTH_PW'] ?? '';
+        
+        if ($auth_user !== $prov_user || $auth_pass !== $prov_pass) {
+            header('WWW-Authenticate: Basic realm="Phone Provisioning"');
+            header('HTTP/1.0 401 Unauthorized');
+            \FreePBX::create()->Logger->log("Unauthorized provisioning attempt for MAC: $mac");
+            die('Authentication required');
+        }
+    }
 }
 
 $model = basename($device['model']); // Sanitize to prevent path traversal
@@ -45,9 +72,12 @@ $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
 
 $wpUrl = "";
 if (!empty($device['wallpaper'])) {
-    $protocol = (isset($_SERVER['HTTPS']) ? "https" : "http");
-    $auth = $ext . ":" . $secret . "@";
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
     $host = $_SERVER['HTTP_HOST'];
+    $auth = "";
+    if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
+        $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
+    }
     $wpUrl = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?mac=$mac";
 }
 
@@ -115,9 +145,12 @@ if (preg_match('/{{contacts_loop}}(.*?){{\/contacts_loop}}/s', $template, $match
         $item = str_replace('{{custom_label}}', htmlspecialchars($c['custom_label']), $item);
         $photo_url = "";
         if (!empty($c['photo'])) {
-            $protocol = (isset($_SERVER['HTTPS']) ? "https" : "http");
-            $auth = $ext . ":" . $secret . "@";
+            $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
             $host = $_SERVER['HTTP_HOST'];
+            $auth = "";
+            if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
+                $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
+            }
             $photo_url = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=$mac&w=100&h=100&mode=crop";
         }
         $item = str_replace('{{photo_url}}', $photo_url, $item);

@@ -1,5 +1,18 @@
 <?php
-// ajax.quickprovisioner.php - HH Quick Provisioner v2.1 - Backend API
+// ajax.quickprovisioner.php - HH Quick Provisioner v2.2 - Backend API
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
+
+if (!qp_is_local_network()) {
+    die(json_encode(['status' => false, 'message' => 'Remote access denied. Admin UI is local network only.']));
+}
+
 if (!defined('FREEPBX_IS_AUTH') || !FREEPBX_IS_AUTH) {
     die(json_encode(['status' => false, 'message' => 'Unauthorized']));
 }
@@ -73,14 +86,16 @@ switch ($action) {
         $wallpaper = $form['wallpaper'] ?? '';
         $wallpaper_mode = $form['wallpaper_mode'] ?? 'crop';
         $security_pin = $form['security_pin'] ?? '';
+        $prov_username = $form['prov_username'] ?? '';
+        $prov_password = $form['prov_password'] ?? '';
 
         $id = $form['deviceId'] ?? null;
         if ($id) {
-            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=? WHERE id=?";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $id];
+            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=? WHERE id=?";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $id];
         } else {
-            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override];
+            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password];
         }
         $db->query($sql, $params);
         \FreePBX::create()->Logger->log("Device saved: MAC=" . $form['mac']);
@@ -242,6 +257,21 @@ switch ($action) {
         } else {
             $response['message'] = $result['message'];
         }
+        break;
+
+    case 'list_assets':
+        $uploads_dir = __DIR__ . '/assets/uploads';
+        $files = [];
+        if (is_dir($uploads_dir)) {
+            foreach (scandir($uploads_dir) as $item) {
+                if ($item === '.' || $item === '..' || $item === '.htaccess') continue;
+                $filepath = $uploads_dir . '/' . $item;
+                if (is_file($filepath)) {
+                    $files[] = ['filename' => $item, 'size' => filesize($filepath)];
+                }
+            }
+        }
+        $response = ['status' => true, 'files' => $files];
         break;
 
     case 'delete_asset':

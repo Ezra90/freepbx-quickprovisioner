@@ -36,6 +36,8 @@ function install() {
             `contacts_json` TEXT DEFAULT NULL COMMENT 'JSON data for contacts',
             `custom_options_json` TEXT DEFAULT NULL COMMENT 'JSON data for custom options',
             `custom_template_override` TEXT DEFAULT NULL COMMENT 'Custom template override',
+            `prov_username` VARCHAR(50) DEFAULT NULL COMMENT 'Provisioning auth username',
+            `prov_password` VARCHAR(100) DEFAULT NULL COMMENT 'Provisioning auth password',
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -312,6 +314,15 @@ function upgrade($oldversion, $newversion) {
         
         // Run install_module to ensure directories and permissions are correct
         install_module();
+        
+        // Add provisioning auth columns if missing
+        global $db;
+        try {
+            $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN IF NOT EXISTS prov_username VARCHAR(50) DEFAULT NULL");
+            $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN IF NOT EXISTS prov_password VARCHAR(100) DEFAULT NULL");
+        } catch (Exception $e) {
+            // Columns may already exist
+        }
         
         return true;
         
