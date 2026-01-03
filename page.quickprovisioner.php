@@ -451,6 +451,7 @@ var currentKeys = [];
 var currentContacts = [];
 var currentDeviceId = null;
 var profiles = {};
+var smartDialShortcuts = []; // NEW: Store smart dial shortcuts
 
 function loadDevices() {
     $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
@@ -528,11 +529,18 @@ function editDevice(id) {
             currentKeys = JSON.parse(d.keys_json) || [];
             currentContacts = JSON.parse(d.contacts_json) || [];
             var custom_options = JSON.parse(d.custom_options_json) || {};
+            // Load smart dial shortcuts from custom_options
+            if (custom_options.smart_dial_shortcuts) {
+                smartDialShortcuts = JSON.parse(custom_options.smart_dial_shortcuts) || [];
+            } else {
+                smartDialShortcuts = [];
+            }
             for (var key in custom_options) {
                 $('[name="custom_options[' + key + ']"]').val(custom_options[key]);
             }
             $('#custom_template_override').val(d.custom_template_override);
             renderPreview();
+            renderSmartDialList(); // Render loaded shortcuts
         }
     }, 'json');
     $('a[href="#tab-edit"]').tab('show');
@@ -571,6 +579,7 @@ function newDevice() {
     $('#wallpaper_mode').val('crop');
     currentKeys = [];
     currentContacts = [];
+    smartDialShortcuts = []; // Clear smart dial shortcuts
     currentDeviceId = null;
     $('#templateHeader').text('Select a model to load template settings');
     $('#handsetSettingsContent').html('<p class="text-muted">Select a model to view handset settings.</p>');
@@ -595,18 +604,43 @@ function loadTemplates() {
 
 function loadProfile() {
     var model = $('#model').val();
-    if (!model) return;
+    if (!model) {
+        console.log('[loadProfile] No model selected');
+        return;
+    }
+    
+    console.log('[loadProfile] Loading template for model:', model);
+    $('#templateHeader').text('Loading template...');
+    
     $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        console.log('[loadProfile] Response received:', r);
+        
         if (r.status) {
-            profiles[model] = JSON.parse(r.json);
-            showModelNotes();
-            loadDeviceOptions();
-            updatePageSelect();
-            renderPreview();
+            try {
+                profiles[model] = JSON.parse(r.json);
+                console.log('[loadProfile] Template parsed successfully:', profiles[model]);
+                
+                showModelNotes();
+                loadDeviceOptions();
+                updatePageSelect();
+                renderPreview();
+                
+                console.log('[loadProfile] All rendering functions completed');
+            } catch (e) {
+                console.error('[loadProfile] JSON parse error:', e);
+                alert('Error parsing template: ' + e.message);
+                $('#templateHeader').html('<span class="text-danger">Error parsing template</span>');
+            }
         } else {
+            console.error('[loadProfile] Load failed:', r.message);
             alert('Error loading model: ' + r.message);
+            $('#templateHeader').html('<span class="text-danger">Error: ' + r.message + '</span>');
         }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+        console.error('[loadProfile] AJAX failed:', status, error, xhr.responseText);
+        alert('Failed to load template. Check console for details.');
+        $('#templateHeader').html('<span class="text-danger">Failed to load template</span>');
+    });
 }
 
 function showModelNotes() {
@@ -1206,9 +1240,18 @@ $('#deviceForm').submit(function(e) {
     }
 
     // Prepare form data
+    // Add smart dial shortcuts to form data
+    var formData = $(this).serializeArray();
+    if (smartDialShortcuts.length > 0) {
+        formData.push({
+            name: 'custom_options[smart_dial_shortcuts]',
+            value: JSON.stringify(smartDialShortcuts)
+        });
+    }
+    
     var data = {
         action: 'save_device',
-        data: $(this).serialize(),
+        data: $.param(formData),
         keys_json: JSON.stringify(currentKeys),
         contacts_json: JSON.stringify(currentContacts)
     };
@@ -1496,9 +1539,34 @@ function renderHandsetSettings() {
     html += '<small class="text-muted">Can customize for remote scenarios using different port/server</small>';
     html += '</div>';
     
-    // Section 4: Template Configurable Options
+    // Section 4: Smart Dial Shortcuts (NEW)
+    html += '<h4>4. Smart Dial Shortcuts</h4>';
+    html += '<div class="well">';
+    html += '<p class="text-muted">Configure single-digit shortcuts (0-9) to dial specific extensions quickly.</p>';
+    html += '<div class="form-group">';
+    html += '<label>Add New Shortcut</label>';
+    html += '<div class="input-group">';
+    html += '<select id="smartDialDigit" class="form-control" style="width:80px;">';
+    for (var i = 0; i <= 9; i++) {
+        html += '<option value="' + i + '">' + i + '</option>';
+    }
+    html += '</select>';
+    html += '<input type="text" id="smartDialExtension" class="form-control" placeholder="Extension to dial (e.g., 202)">';
+    html += '<span class="input-group-btn">';
+    html += '<button type="button" class="btn btn-primary" onclick="addSmartDialShortcut()"><i class="fa fa-plus"></i> Add</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div id="smartDialList">';
+    html += '<strong>Configured Shortcuts:</strong>';
+    html += '<ul id="smartDialItems" style="list-style:none; padding-left:0;"></ul>';
+    html += '</div>';
+    html += '<small class="text-muted">Example: Press "2" to automatically dial extension 202</small>';
+    html += '</div>';
+    
+    // Section 5: Template Configurable Options
     if (profile.configurable_options && profile.configurable_options.length > 0) {
-        html += '<h4>4. Template Configurable Options</h4>';
+        html += '<h4>5. Template Configurable Options</h4>';
         html += '<div class="well">';
         html += '<div id="deviceOptions">';
         profile.configurable_options.forEach(function(opt) {
@@ -1543,6 +1611,64 @@ function renderHandsetSettings() {
     
     $('#handsetSettingsContent').html(html);
     updateAccountSetupPreview();
+    renderSmartDialList(); // Render any existing shortcuts
+}
+
+// Render Smart Dial Shortcuts List
+function renderSmartDialList() {
+    if ($('#smartDialItems').length === 0) {
+        return;
+    }
+    
+    var html = '';
+    if (smartDialShortcuts.length === 0) {
+        html = '<li class="text-muted"><em>No shortcuts configured yet</em></li>';
+    } else {
+        smartDialShortcuts.forEach(function(shortcut, index) {
+            html += '<li style="padding:5px; border-bottom:1px solid #eee;">';
+            html += '<strong>' + shortcut.digit + '</strong> → Dials <strong>' + shortcut.extension + '</strong>';
+            html += ' <button type="button" class="btn btn-xs btn-danger pull-right" onclick="removeSmartDialShortcut(' + index + ')">';
+            html += '<i class="fa fa-trash"></i> Remove</button>';
+            html += '</li>';
+        });
+    }
+    $('#smartDialItems').html(html);
+}
+
+// Add Smart Dial Shortcut
+function addSmartDialShortcut() {
+    var digit = $('#smartDialDigit').val();
+    var extension = $('#smartDialExtension').val().trim();
+    
+    if (!extension) {
+        alert('Please enter an extension number');
+        return;
+    }
+    
+    // Check if digit already exists
+    var existing = smartDialShortcuts.findIndex(function(s) { return s.digit === digit; });
+    if (existing >= 0) {
+        if (!confirm('Digit ' + digit + ' already has a shortcut. Replace it?')) {
+            return;
+        }
+        smartDialShortcuts.splice(existing, 1);
+    }
+    
+    smartDialShortcuts.push({
+        digit: digit,
+        extension: extension
+    });
+    
+    renderSmartDialList();
+    $('#smartDialExtension').val(''); // Clear input
+}
+
+// Remove Smart Dial Shortcut
+function removeSmartDialShortcut(index) {
+    if (confirm('Remove this shortcut?')) {
+        smartDialShortcuts.splice(index, 1);
+        renderSmartDialList();
+    }
 }
 
 // Update Account Setup Live Preview
@@ -1591,6 +1717,11 @@ function renderPhoneAssets() {
     html += '<label class="btn btn-default">';
     html += '<input type="file" id="wallpaperUploadInput" accept="image/jpeg,image/png" style="display:none;">';
     html += '<i class="fa fa-folder-open"></i> Choose File';
+    html += '</label>';
+    html += '</div>';
+    html += '<div class="checkbox">';
+    html += '<label>';
+    html += '<input type="checkbox" id="autoResizeWallpaper" checked> Auto-resize to ' + screenWidth + 'x' + screenHeight + ' (recommended)';
     html += '</label>';
     html += '</div>';
     html += '</div>';
@@ -1695,10 +1826,27 @@ function uploadWallpaperAsset() {
     var file = $('#wallpaperUploadInput')[0].files[0];
     if (!file) return;
     
+    var autoResize = $('#autoResizeWallpaper').is(':checked');
+    var model = $('#model').val();
+    var profile = profiles[model];
+    
     var fd = new FormData();
     fd.append('file', file);
-    fd.append('action', 'upload_file');
     fd.append('csrf_token', '<?= $csrf_token ?>');
+    
+    // Use resize_image action if auto-resize is enabled
+    if (autoResize && profile && profile.visual_editor) {
+        fd.append('action', 'resize_image');
+        fd.append('width', profile.visual_editor.screen_width || 800);
+        fd.append('height', profile.visual_editor.screen_height || 480);
+    } else {
+        fd.append('action', 'upload_file');
+    }
+    
+    // Show loading indicator
+    var btn = $('.btn:contains("Choose File")');
+    var originalText = btn.html();
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Uploading...');
     
     $.ajax({
         url: 'ajax.quickprovisioner.php',
@@ -1707,13 +1855,23 @@ function uploadWallpaperAsset() {
         contentType: false,
         processData: false,
         success: function(r) {
+            btn.prop('disabled', false).html(originalText);
+            
             if (r.status) {
-                alert('Asset uploaded successfully!');
-                selectAssetForWallpaper(r.url);
+                var message = 'Asset uploaded successfully!';
+                if (autoResize) {
+                    message += ' (Auto-resized to template dimensions)';
+                }
+                alert(message);
+                selectAssetForWallpaper(r.url || r.filename);
                 loadAssetsIntoGallery();
             } else {
                 alert('Error: ' + r.message);
             }
+        },
+        error: function() {
+            btn.prop('disabled', false).html(originalText);
+            alert('Upload failed. Please try again.');
         }
     });
 }
@@ -1733,7 +1891,11 @@ function renderButtonLayout() {
 
 // Generate Provisioning File
 function generateProvisioningFile() {
+    console.log('[generateProvisioningFile] Starting config generation');
+    console.log('[generateProvisioningFile] Current device ID:', currentDeviceId);
+    
     if (!currentDeviceId) {
+        console.warn('[generateProvisioningFile] No device ID - device must be saved first');
         alert('Please save the device first before generating provisioning file.');
         return;
     }
@@ -1743,24 +1905,36 @@ function generateProvisioningFile() {
     var originalText = btn.html();
     btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Generating...');
     
+    console.log('[generateProvisioningFile] Sending request to backend');
+    
     $.post('ajax.quickprovisioner.php', {
         action: 'generate_config',
         id: currentDeviceId,
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
+        console.log('[generateProvisioningFile] Response received:', r);
+        
         btn.prop('disabled', false).html(originalText);
         
         if (r.status) {
+            console.log('[generateProvisioningFile] Config generated successfully');
+            console.log('[generateProvisioningFile] Filename:', r.filename);
+            console.log('[generateProvisioningFile] Config length:', r.config.length, 'bytes');
+            
             $('#generatedConfig').val(r.config);
             $('#generatedFilename').text(r.filename);
             $('#deployFilename').text(r.filename);
             $('#generateModal').modal('show');
         } else {
+            console.error('[generateProvisioningFile] Generation failed:', r.message);
             alert('Error generating config: ' + (r.message || 'Unknown error'));
         }
-    }, 'json').fail(function() {
+    }, 'json').fail(function(xhr, status, error) {
+        console.error('[generateProvisioningFile] AJAX failed:', status, error);
+        console.error('[generateProvisioningFile] Response:', xhr.responseText);
+        
         btn.prop('disabled', false).html(originalText);
-        alert('Failed to generate config. Please try again.');
+        alert('Failed to generate config. Check console for details.');
     });
 }
 

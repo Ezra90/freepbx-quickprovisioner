@@ -854,6 +854,22 @@ switch ($action) {
             }
         }
         
+        // Process smart dial shortcuts (NEW)
+        $custom_options = json_decode($device['custom_options_json'] ?? '{}', true) ?? [];
+        if (!empty($custom_options['smart_dial_shortcuts'])) {
+            $shortcuts = json_decode($custom_options['smart_dial_shortcuts'], true) ?? [];
+            if (!empty($shortcuts)) {
+                $smartDialConfig = "\n# Smart Dial Shortcuts\n";
+                foreach ($shortcuts as $idx => $shortcut) {
+                    $ruleNum = $idx + 1;
+                    $smartDialConfig .= "dialplan.replace.rule.$ruleNum = " . $shortcut['digit'] . "\n";
+                    $smartDialConfig .= "dialplan.replace.replace.$ruleNum = " . $shortcut['extension'] . "\n";
+                }
+                // Append to template
+                $template .= $smartDialConfig;
+            }
+        }
+        
         // Replace all remaining variables
         foreach ($vars as $k => $v) {
             $template = str_replace($k, $v, $template);
