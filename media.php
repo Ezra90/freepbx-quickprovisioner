@@ -1,38 +1,51 @@
 <?php
-// media.php - HH Quick Provisioner v2.0.0 - Secure Resizer
+// media.php - HH Quick Provisioner v2.2 - Secure Resizer
 include '/etc/freepbx.conf';
 
-$authorized = false;
+function qp_is_local_network() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($ip === '::1') return true;
+    if (preg_match('/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip)) {
+        return true;
+    }
+    return false;
+}
 
-if (isset($_SESSION['AMP_user']) && is_object($_SESSION['AMP_user'])) {
+$authorized = false;
+$mac = isset($_GET['mac']) ? strtoupper(preg_replace('/[^A-F0-9]/', '', $_GET['mac'])) : null;
+
+// Local network always authorized
+if (qp_is_local_network()) {
     $authorized = true;
 }
 
-$mac = $_GET['mac'] ?? null;
-if (!$authorized && isset($_SERVER['PHP_AUTH_USER'])) {
+// Check session auth (FreePBX admin logged in)
+if (!$authorized && isset($_SESSION['AMP_user']) && is_object($_SESSION['AMP_user'])) {
+    $authorized = true;
+}
+
+// Check per-device provisioning auth
+if (!$authorized && $mac && isset($_SERVER['PHP_AUTH_USER'])) {
     global $db;
-    $ext = $_SERVER['PHP_AUTH_USER'];
-    $pass = $_SERVER['PHP_AUTH_PW'] ?? '';
-    $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE extension=?", [$ext]);
-    if ($device) {
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
-        if ($pass === $secret) {
+    $device = $db->getRow("SELECT prov_username, prov_password FROM quickprovisioner_devices WHERE mac=?", [$mac]);
+    if ($device && !empty($device['prov_username']) && !empty($device['prov_password'])) {
+        if ($_SERVER['PHP_AUTH_USER'] === $device['prov_username'] && ($_SERVER['PHP_AUTH_PW'] ?? '') === $device['prov_password']) {
             $authorized = true;
         }
     }
 }
 
+// Fallback: MAC-only auth if no provisioning credentials set
 if (!$authorized && $mac) {
     global $db;
-    $count = $db->getOne("SELECT COUNT(*) FROM quickprovisioner_devices WHERE mac=?", [$mac]);
-    if ($count > 0) {
+    $device = $db->getRow("SELECT prov_username, prov_password FROM quickprovisioner_devices WHERE mac=?", [$mac]);
+    if ($device && empty($device['prov_username']) && empty($device['prov_password'])) {
         $authorized = true;
     }
 }
 
 if (!$authorized) {
-    \FreePBX::create()->Logger->log("Unauthorized media access attempt: ext=" . ($_SERVER['PHP_AUTH_USER'] ?? 'none') . ", mac=" . ($mac ?? 'none'));
-    header('WWW-Authenticate: Basic realm="Provisioner"');
+    header('WWW-Authenticate: Basic realm="Phone Provisioning"');
     header('HTTP/1.0 401 Unauthorized');
     die('Access Denied');
 }
