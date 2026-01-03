@@ -14,12 +14,26 @@ if (!qp_is_local_network()) {
 
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 
+// Verify FreePBX Core is available
+if (!class_exists('FreePBX') || !\FreePBX::Core()) {
+    die('FreePBX Core not available. Please ensure FreePBX is properly installed.');
+}
+
 $devices = \FreePBX::Database()->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 $extensions = [];
-$users = \FreePBX::Core()->getAllUsers();
-foreach ($users as $user) {
-    $extensions[] = $user['extension'];
+try {
+    $users = \FreePBX::Core()->getAllUsers();
+    if ($users && is_array($users)) {
+        foreach ($users as $user) {
+            if (isset($user['extension'])) {
+                $extensions[] = $user['extension'];
+            }
+        }
+    }
+} catch (Exception $e) {
+    // Log error but don't stop execution
+    error_log("Quick Provisioner: Failed to fetch extensions - " . $e->getMessage());
 }
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -362,10 +376,9 @@ function loadDevices() {
             r.devices.forEach(function(d) {
                 var secretDisplay = '';
                 if (d.secret) {
-                    // Show indicator that secret exists without revealing any characters
-                    secretDisplay = '<span class="text-success">••••••••</span> ';
-                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="revealSecret(' + d.id + ')" data-device-id="' + d.id + '" title="Reveal secret"><i class="fa fa-eye"></i></button> ';
-                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="copyDeviceSecret(' + d.id + ')" data-device-id="' + d.id + '" title="Copy secret"><i class="fa fa-copy"></i></button>';
+                    // Display secret directly in plain text
+                    var escapedSecret = $('<div>').text(d.secret).html();
+                    secretDisplay = '<span>' + escapedSecret + '</span>';
                 } else {
                     secretDisplay = '<span class="text-muted">N/A</span>';
                 }
@@ -381,57 +394,6 @@ function loadDevices() {
         }
     }, 'json').fail(function() {
         $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Failed to load devices</td></tr>');
-    });
-}
-
-function revealSecret(deviceId) {
-    // Fetch secret securely via AJAX
-    $.post('ajax.quickprovisioner.php', {action:'get_device_secret', id:deviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
-        if (r.status) {
-            // Use a modal instead of alert for better security
-            showSecretModal(r.secret);
-        } else {
-            alert('Error: ' + $('<div>').text(r.message).html());
-        }
-    }, 'json');
-}
-
-function copyDeviceSecret(deviceId) {
-    // Fetch secret securely via AJAX before copying
-    $.post('ajax.quickprovisioner.php', {action:'get_device_secret', id:deviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
-        if (r.status) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(r.secret).then(function() {
-                    alert('Secret copied to clipboard!');
-                }).catch(function(err) {
-                    // Fallback for copy failure
-                    showSecretModal(r.secret, 'Copy failed. Please copy manually:');
-                });
-            } else {
-                // Fallback for non-HTTPS or unsupported browsers
-                showSecretModal(r.secret, 'Clipboard not available. Please copy manually:');
-            }
-        } else {
-            alert('Error: ' + $('<div>').text(r.message).html());
-        }
-    }, 'json');
-}
-
-function showSecretModal(secret, message) {
-    message = message || 'SIP Secret:';
-    var escapedSecret = $('<div>').text(secret).html();
-    var escapedMessage = $('<div>').text(message).html();
-    var modalHtml = '<div class="modal fade" id="secretModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">';
-    modalHtml += '<div class="modal-header"><h4 class="modal-title">' + escapedMessage + '</h4></div>';
-    modalHtml += '<div class="modal-body"><input type="text" class="form-control" value="' + escapedSecret + '" readonly onclick="this.select()"></div>';
-    modalHtml += '<div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">Close</button></div>';
-    modalHtml += '</div></div></div>';
-    // Remove any existing modal
-    $('#secretModal').remove();
-    $('body').append(modalHtml);
-    $('#secretModal').modal('show');
-    $('#secretModal').on('hidden.bs.modal', function() {
-        $(this).remove();
     });
 }
 

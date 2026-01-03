@@ -119,39 +119,29 @@ switch ($action) {
         $devices = [];
         foreach ($rows as $row) {
             $ext = $row['extension'];
-            // Try to fetch secret from FreePBX - check for null/false
-            $device = \FreePBX::Core()->getDevice($ext);
-            $secret = ($device && isset($device['secret'])) ? $device['secret'] : '';
+            $secret = '';
+            try {
+                // Try to fetch secret from FreePBX - check for null/false
+                $device = \FreePBX::Core()->getDevice($ext);
+                if ($device && is_array($device) && isset($device['secret'])) {
+                    $secret = $device['secret'];
+                } else {
+                    // Log when device not found
+                    error_log("Quick Provisioner: Secret not found for extension $ext");
+                }
+            } catch (Exception $e) {
+                // Log error but continue with other devices
+                error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
+            }
             $devices[] = [
                 'id' => $row['id'],
                 'mac' => $row['mac'],
                 'extension' => $row['extension'],
                 'model' => $row['model'],
-                'secret' => $secret ? '***' : '' // Only send indicator, not actual secret
+                'secret' => $secret // Return actual secret for display
             ];
         }
         $response = ['status' => true, 'devices' => $devices];
-        break;
-
-    case 'get_device_secret':
-        $id = $_REQUEST['id'] ?? null;
-        if (!$id || !is_numeric($id)) {
-            $response['message'] = 'Invalid device ID';
-            break;
-        }
-        $device = $db->getRow("SELECT extension FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
-        if (!$device) {
-            $response['message'] = 'Device not found';
-            break;
-        }
-        $ext = $device['extension'];
-        $freepbxDevice = \FreePBX::Core()->getDevice($ext);
-        $secret = ($freepbxDevice && isset($freepbxDevice['secret'])) ? $freepbxDevice['secret'] : '';
-        if ($secret) {
-            $response = ['status' => true, 'secret' => $secret];
-        } else {
-            $response['message'] = 'Secret not found for extension ' . $ext;
-        }
         break;
 
     case 'delete_device':
@@ -183,9 +173,26 @@ switch ($action) {
         $custom_options = json_decode($device['custom_options_json'], true) ?? [];
         $template = $device['custom_template_override'] ? $device['custom_template_override'] : $profile['provisioning']['template'] ?? '';
         $ext = $device['extension'];
-        $userInfo = \FreePBX::Core()->getUser($ext);
-        $display_name = $userInfo['name'] ?? $ext;
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+
+        // Fetch user info and secret with error handling
+        $display_name = $ext;
+        $secret = '';
+        try {
+            $userInfo = \FreePBX::Core()->getUser($ext);
+            if ($userInfo && is_array($userInfo) && isset($userInfo['name'])) {
+                $display_name = $userInfo['name'];
+            }
+
+            $deviceInfo = \FreePBX::Core()->getDevice($ext);
+            if ($deviceInfo && is_array($deviceInfo) && isset($deviceInfo['secret'])) {
+                $secret = $deviceInfo['secret'];
+            } else {
+                error_log("Quick Provisioner: Secret not found for extension $ext during config preview");
+            }
+        } catch (Exception $e) {
+            error_log("Quick Provisioner: Error fetching FreePBX data for extension $ext - " . $e->getMessage());
+        }
+
         $server_ip = $_SERVER['SERVER_ADDR'];
         $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
         $wpUrl = "";
@@ -377,12 +384,25 @@ switch ($action) {
 
     case 'get_sip_secret':
         $ext = $_REQUEST['extension'] ?? null;
-        if (!$ext) { $response['message'] = 'No extension'; break; }
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
-        if ($secret) {
-            $response = ['status' => true, 'secret' => $secret];
-        } else {
-            $response['message'] = 'Secret not found';
+        if (!$ext) {
+            $response['message'] = 'No extension provided';
+            break;
+        }
+        try {
+            $device = \FreePBX::Core()->getDevice($ext);
+            $secret = '';
+            if ($device && is_array($device) && isset($device['secret'])) {
+                $secret = $device['secret'];
+            }
+            if ($secret) {
+                $response = ['status' => true, 'secret' => $secret];
+            } else {
+                $response['message'] = "Secret not found for extension $ext. Extension may not exist in FreePBX.";
+                error_log("Quick Provisioner: Secret not found for extension $ext");
+            }
+        } catch (Exception $e) {
+            $response['message'] = "Error fetching secret: " . $e->getMessage();
+            error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
         }
         break;
 
