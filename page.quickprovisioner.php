@@ -49,7 +49,7 @@ $csrf_token = $_SESSION['qp_csrf'];
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
-        <li><a data-toggle="tab" href="#tab-edit">Add/Edit Device</a></li>
+        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Device</a></li>
         <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
         <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
         <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
@@ -163,14 +163,23 @@ $csrf_token = $_SESSION['qp_csrf'];
                         <div class="form-group"><label>Wallpaper</label>
                             <div class="input-group">
                                 <input type="text" id="wallpaper" class="form-control" readonly placeholder="Click Pick to select" onchange="renderPreview()">
-                                <span class="input-group-btn"><button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button></span>
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button>
+                                    <button type="button" class="btn btn-default" onclick="clearWallpaper()" title="Clear wallpaper">
+                                        <i class="fa fa-times"></i>
+                                    </button>
+                                </span>
+                            </div>
+                            <div id="wallpaperPreview" style="margin-top:10px; display:none;">
+                                <img id="wallpaperPreviewImg" style="max-width:200px; max-height:150px; border:1px solid #ccc; border-radius:4px;">
                             </div>
                         </div>
                         <div class="form-group"><label>Wallpaper Mode</label>
                             <select id="wallpaper_mode" class="form-control" onchange="renderPreview()">
-                                <option value="crop">Crop to Fill</option>
-                                <option value="fit">Fit (Letterbox)</option>
+                                <option value="crop">Crop to Fill (recommended)</option>
+                                <option value="fit">Fit (Letterbox - may show black bars)</option>
                             </select>
+                            <small class="help-block text-muted">Crop mode fills the entire screen by cropping edges. Fit mode shows the entire image with possible black bars.</small>
                         </div>
                         <div class="form-group"><label>Page</label>
                             <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
@@ -442,6 +451,7 @@ function editDevice(id) {
             loadSipSecret(); // Load secret after extension set
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
+            updateWallpaperPreview(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
             $('#prov_username').val(d.prov_username || '');
             $('#prov_password').val(d.prov_password || '');
@@ -535,19 +545,40 @@ function loadDeviceOptions() {
     if (profile && profile.configurable_options) {
         profile.configurable_options.forEach(function(opt) {
             html += '<div class="form-group">';
-            html += '<label title="' + (opt.description || '') + '">' + opt.label + '</label>';
+            // Label with required indicator
+            html += '<label title="' + (opt.description || '') + '">';
+            html += opt.label;
+            if (opt.required) {
+                html += ' <span class="text-danger">*</span>';
+            }
+            html += '</label>';
+            
+            // Field based on type
             if (opt.type === 'bool') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"><option value="">Default (' + opt.default + ')</option><option value="1">On</option><option value="0">Off</option></select>';
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
+                html += '<option value="1">On</option>';
+                html += '<option value="0">Off</option>';
+                html += '</select>';
             } else if (opt.type === 'select') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"><option value="">Default (' + opt.default + ')</option>';
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
                 for (var val in opt.options) {
                     html += '<option value="' + val + '">' + opt.options[val] + '</option>';
                 }
                 html += '</select>';
             } else if (opt.type === 'number') {
-                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" placeholder="Default: ' + opt.default + '">';
+                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
             } else {
-                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" placeholder="Default: ' + opt.default + '">';
+                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+            }
+            
+            // Description help text
+            if (opt.description) {
+                html += '<small class="help-block text-muted">' + opt.description + '</small>';
             }
             html += '</div>';
         });
@@ -583,10 +614,36 @@ function renderPreview() {
         container.css('backgroundImage', 'url(' + ve.background_image_url + ')');
     } else if (ve.svg_fallback) {
         var sch = ve.schematic;
+        // Enhanced SVG scaffold with better visual representation
         var svg = `<svg width="${sch.chassis_width}" height="${sch.chassis_height}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100%" height="100%" fill="#333" rx="30"/>
-            <rect x="${sch.screen_x}" y="${sch.screen_y}" width="${sch.screen_width}" height="${sch.screen_height}" fill="#000"/>
-            <text x="50%" y="50%" fill="#666" font-size="24" text-anchor="middle" dominant-baseline="middle">SVG Fallback</text>
+            <!-- Phone chassis with gradient -->
+            <defs>
+                <linearGradient id="chassis-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#4a4a4a;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#2a2a2a;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="screen-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#0a0a0a;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <!-- Chassis background -->
+            <rect width="100%" height="100%" fill="url(#chassis-gradient)" rx="30" ry="30"/>
+            <!-- Screen area with border -->
+            <rect x="${sch.screen_x}" y="${sch.screen_y}" width="${sch.screen_width}" height="${sch.screen_height}" 
+                  fill="url(#screen-gradient)" stroke="#555" stroke-width="2" rx="5" ry="5"/>
+            <!-- Screen frame highlight -->
+            <rect x="${sch.screen_x + 2}" y="${sch.screen_y + 2}" width="${sch.screen_width - 4}" height="${sch.screen_height - 4}" 
+                  fill="none" stroke="#666" stroke-width="1" rx="4" ry="4"/>
+            <!-- Model label -->
+            <text x="50%" y="30" fill="#999" font-size="18" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">
+                ${profile.display_name || model}
+            </text>
+            <!-- SVG Fallback indicator -->
+            <text x="50%" y="${sch.screen_y + sch.screen_height/2}" fill="#444" font-size="16" text-anchor="middle" 
+                  dominant-baseline="middle" font-family="Arial, sans-serif">
+                SVG Preview Mode
+            </text>
         </svg>`;
         container.css('backgroundImage', 'url(data:image/svg+xml;base64,' + btoa(svg) + ')');
     }
@@ -907,8 +964,24 @@ function loadAssets() {
 
 function selectAsset(filename) {
     $('#wallpaper').val(filename);
+    updateWallpaperPreview(filename);
     renderPreview();
     $('a[href="#tab-edit"]').tab('show');
+}
+
+function clearWallpaper() {
+    $('#wallpaper').val('');
+    $('#wallpaperPreview').hide();
+    renderPreview();
+}
+
+function updateWallpaperPreview(filename) {
+    if (filename) {
+        $('#wallpaperPreviewImg').attr('src', 'assets/uploads/' + filename);
+        $('#wallpaperPreview').show();
+    } else {
+        $('#wallpaperPreview').hide();
+    }
 }
 
 function deleteAsset(filename) {
@@ -1027,6 +1100,26 @@ $('#deviceForm').submit(function(e) {
     if (!extension) {
         alert('Please select or enter an extension');
         return;
+    }
+
+    // Validate required configurable options
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.configurable_options) {
+        var missingRequired = [];
+        profile.configurable_options.forEach(function(opt) {
+            if (opt.required) {
+                var fieldValue = $('[name="custom_options[' + opt.name + ']"]').val();
+                if (!fieldValue || fieldValue.trim() === '') {
+                    missingRequired.push(opt.label);
+                }
+            }
+        });
+        
+        if (missingRequired.length > 0) {
+            alert('Please fill in the following required fields:\n\n• ' + missingRequired.join('\n• '));
+            return;
+        }
     }
 
     // Prepare form data

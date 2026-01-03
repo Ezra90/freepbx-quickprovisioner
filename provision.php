@@ -184,6 +184,52 @@ if (preg_match('/{{contacts_loop}}(.*?){{\/contacts_loop}}/s', $template, $match
     $template = str_replace($matches[0], $builtLoop, $template);
 }
 
+// Generic array repeater handler for digitmap and other custom repeaters
+if (preg_match_all('/{{([a-z_]+)_loop}}(.*?){{\/\1_loop}}/s', $template, $allMatches, PREG_SET_ORDER)) {
+    foreach ($allMatches as $match) {
+        $loopName = $match[1];
+        // Skip already processed loops
+        if ($loopName === 'line_keys' || $loopName === 'contacts') {
+            continue;
+        }
+        
+        $loopContent = $match[2];
+        $loopData = [];
+        
+        // Check if template defines the array data source
+        if (isset($profile['provisioning'][$loopName . '_data'])) {
+            $loopData = $profile['provisioning'][$loopName . '_data'];
+        }
+        // Or check if device has custom data for this loop
+        else if (!empty($device['custom_options_json'])) {
+            $customOptions = json_decode($device['custom_options_json'], true) ?? [];
+            if (isset($customOptions[$loopName . '_data'])) {
+                $loopData = json_decode($customOptions[$loopName . '_data'], true) ?? [];
+            }
+        }
+        
+        $builtLoop = '';
+        foreach ($loopData as $idx => $item_data) {
+            $item = $loopContent;
+            // Replace {{index}} with 1-based index
+            $item = str_replace('{{index}}', $idx + 1, $item);
+            // Replace any other variables from the data item
+            if (is_array($item_data)) {
+                foreach ($item_data as $key => $value) {
+                    $item = str_replace('{{' . $key . '}}', htmlspecialchars($value), $item);
+                }
+            } else {
+                // If item is a scalar, replace {{value}}
+                $item = str_replace('{{value}}', htmlspecialchars($item_data), $item);
+            }
+            // Clean up any remaining unreplaced variables
+            $item = preg_replace('/{{[a-z_]+}}/', '', $item);
+            $builtLoop .= $item;
+        }
+        $template = str_replace($match[0], $builtLoop, $template);
+    }
+}
+
 foreach ($vars as $k => $v) {
     $template = str_replace($k, $v, $template);
 }
