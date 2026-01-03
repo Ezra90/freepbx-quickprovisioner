@@ -26,6 +26,7 @@ $csrf_token = $_SESSION['qp_csrf'];
         <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
         <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
         <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
+        <li><a data-toggle="tab" href="#tab-admin">Admin</a></li>
     </ul>
 
     <div class="tab-content" style="padding-top:20px;">
@@ -186,6 +187,40 @@ $csrf_token = $_SESSION['qp_csrf'];
                     </div>
                     
                     <div id="updateResult" style="margin-top: 15px; display: none;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="tab-admin" class="tab-pane fade">
+            <!-- PBX Controls Panel -->
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">🎛️ PBX Controls</h3>
+                </div>
+                <div class="panel-body">
+                    <p class="text-info">
+                        <i class="fa fa-info-circle"></i> Use these controls to apply configuration changes or restart the PBX.
+                    </p>
+                    
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="reloadPBX()">
+                            <i class="fa fa-refresh"></i> Reload Config
+                        </button>
+                        <span class="text-muted">Apply configuration changes without interrupting calls</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button class="btn btn-warning" onclick="restartPBX()">
+                            <i class="fa fa-power-off"></i> Restart PBX
+                        </button>
+                        <span class="text-danger">
+                            <i class="fa fa-exclamation-triangle"></i> <strong>Warning:</strong> This will briefly interrupt active calls!
+                        </span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div id="pbxStatus" style="margin-top: 15px;"></div>
                 </div>
             </div>
         </div>
@@ -755,6 +790,43 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+// PBX Control Functions
+function reloadPBX() {
+    if (!confirm('Apply configuration changes? This will not interrupt calls.')) return;
+    
+    $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Reloading...');
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'restart_pbx',
+        type: 'reload',
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status) {
+            $('#pbxStatus').html('<span class="text-success"><i class="fa fa-check"></i> ' + r.message + '</span>');
+        } else {
+            $('#pbxStatus').html('<span class="text-danger"><i class="fa fa-times"></i> ' + r.message + '</span>');
+        }
+    }, 'json');
+}
+
+function restartPBX() {
+    if (!confirm('Are you sure you want to restart the PBX?\n\nThis will briefly interrupt any active calls!')) return;
+    
+    $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Restarting PBX...');
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'restart_pbx',
+        type: 'restart',
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status) {
+            $('#pbxStatus').html('<span class="text-success"><i class="fa fa-check"></i> ' + r.message + '</span>');
+        } else {
+            $('#pbxStatus').html('<span class="text-danger"><i class="fa fa-times"></i> ' + r.message + '</span>');
+        }
+    }, 'json');
 }
 
 // Load current commit on page load
