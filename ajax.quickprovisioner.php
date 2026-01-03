@@ -114,6 +114,36 @@ switch ($action) {
         $response = ['status' => true, 'devices' => $rows];
         break;
 
+    case 'list_devices_with_secrets':
+        $rows = $db->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $devices = [];
+        foreach ($rows as $row) {
+            $ext = $row['extension'];
+            $secret = '';
+            try {
+                // Try to fetch secret from FreePBX - check for null/false
+                $device = \FreePBX::Core()->getDevice($ext);
+                if ($device && is_array($device) && isset($device['secret'])) {
+                    $secret = $device['secret'];
+                } else {
+                    // Log when device not found
+                    error_log("Quick Provisioner: Secret not found for extension $ext");
+                }
+            } catch (Exception $e) {
+                // Log error but continue with other devices
+                error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
+            }
+            $devices[] = [
+                'id' => $row['id'],
+                'mac' => $row['mac'],
+                'extension' => $row['extension'],
+                'model' => $row['model'],
+                'secret' => $secret // Return actual secret for display
+            ];
+        }
+        $response = ['status' => true, 'devices' => $devices];
+        break;
+
     case 'delete_device':
         $id = $_REQUEST['id'] ?? null;
         if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
@@ -143,9 +173,26 @@ switch ($action) {
         $custom_options = json_decode($device['custom_options_json'], true) ?? [];
         $template = $device['custom_template_override'] ? $device['custom_template_override'] : $profile['provisioning']['template'] ?? '';
         $ext = $device['extension'];
-        $userInfo = \FreePBX::Core()->getUser($ext);
-        $display_name = $userInfo['name'] ?? $ext;
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+
+        // Fetch user info and secret with error handling
+        $display_name = $ext;
+        $secret = '';
+        try {
+            $userInfo = \FreePBX::Core()->getUser($ext);
+            if ($userInfo && is_array($userInfo) && isset($userInfo['name'])) {
+                $display_name = $userInfo['name'];
+            }
+
+            $deviceInfo = \FreePBX::Core()->getDevice($ext);
+            if ($deviceInfo && is_array($deviceInfo) && isset($deviceInfo['secret'])) {
+                $secret = $deviceInfo['secret'];
+            } else {
+                error_log("Quick Provisioner: Secret not found for extension $ext during config preview");
+            }
+        } catch (Exception $e) {
+            error_log("Quick Provisioner: Error fetching FreePBX data for extension $ext - " . $e->getMessage());
+        }
+
         $server_ip = $_SERVER['SERVER_ADDR'];
         $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
         $wpUrl = "";
@@ -337,26 +384,39 @@ switch ($action) {
 
     case 'get_sip_secret':
         $ext = $_REQUEST['extension'] ?? null;
-        if (!$ext) { $response['message'] = 'No extension'; break; }
-        $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
-        if ($secret) {
-            $response = ['status' => true, 'secret' => $secret];
-        } else {
-            $response['message'] = 'Secret not found';
+        if (!$ext) {
+            $response['message'] = 'No extension provided';
+            break;
+        }
+        try {
+            $device = \FreePBX::Core()->getDevice($ext);
+            $secret = '';
+            if ($device && is_array($device) && isset($device['secret'])) {
+                $secret = $device['secret'];
+            }
+            if ($secret) {
+                $response = ['status' => true, 'secret' => $secret];
+            } else {
+                $response['message'] = "Secret not found for extension $ext. Extension may not exist in FreePBX.";
+                error_log("Quick Provisioner: Secret not found for extension $ext");
+            }
+        } catch (Exception $e) {
+            $response['message'] = "Error fetching secret: " . $e->getMessage();
+            error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
         }
         break;
-    
+
     // === UPDATE MANAGEMENT ACTIONS ===
     case 'check_updates':
         $module_dir = __DIR__;
-        
+
         // Get current commit hash
         $current_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
         if (empty($current_commit) || strlen($current_commit) !== 40) {
             $response['message'] = 'Failed to get current commit: ' . $current_commit;
             break;
         }
-        
+
         // Get current version from module.xml
         $module_xml_path = $module_dir . '/module.xml';
         $current_version = '2.1.0'; // Default
@@ -366,7 +426,7 @@ switch ($action) {
                 $current_version = $matches[1];
             }
         }
-        
+
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
@@ -375,20 +435,20 @@ switch ($action) {
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
-        
+
         // Fetch from origin
         $fetch_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git fetch origin main 2>&1");
-        
+
         // Get remote commit hash
         $remote_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse origin/main 2>&1"));
         if (empty($remote_commit) || strlen($remote_commit) !== 40) {
             $response['message'] = 'Failed to get remote commit. Fetch output: ' . $fetch_output;
             break;
         }
-        
+
         // Check if updates are available
         $has_updates = ($current_commit !== $remote_commit);
-        
+
         $response = [
             'status' => true,
             'current_commit' => $current_commit,
@@ -397,17 +457,17 @@ switch ($action) {
             'has_updates' => $has_updates
         ];
         break;
-    
+
     case 'get_changelog':
         $module_dir = __DIR__;
         $current_commit = $_POST['current_commit'] ?? '';
         $remote_commit = $_POST['remote_commit'] ?? '';
-        
+
         if (empty($current_commit) || empty($remote_commit)) {
             $response['message'] = 'Missing commit parameters';
             break;
         }
-        
+
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
@@ -416,7 +476,7 @@ switch ($action) {
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
-        
+
         // Get list of commits between current and remote
         $log_cmd = sprintf(
             "cd %s && git log %s..%s --pretty=format:'%%H||%%s||%%an||%%ai' 2>&1",
@@ -425,7 +485,7 @@ switch ($action) {
             escapeshellarg($remote_commit)
         );
         $log_output = shell_exec($log_cmd);
-        
+
         $commits = [];
         if (!empty($log_output)) {
             $lines = explode("\n", trim($log_output));
@@ -442,19 +502,19 @@ switch ($action) {
                 }
             }
         }
-        
+
         $response = [
             'status' => true,
             'commits' => $commits
         ];
         break;
-    
+
     case 'perform_update':
         $module_dir = __DIR__;
-        
+
         // Get current commit before update
         $old_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
-        
+
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
@@ -463,15 +523,15 @@ switch ($action) {
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
-        
+
         // Perform git pull
         $pull_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git pull origin main 2>&1");
-        
+
         // Check if pull was successful
         if (strpos($pull_output, 'Already up to date') !== false || strpos($pull_output, 'Fast-forward') !== false || strpos($pull_output, 'Updating') !== false) {
             // Get new commit hash
             $new_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
-            
+
             // Get new version from module.xml
             $module_xml_path = $module_dir . '/module.xml';
             $new_version = null;
@@ -481,10 +541,10 @@ switch ($action) {
                     $new_version = $matches[1];
                 }
             }
-            
+
             // Fix permissions with targeted approach
             // Note: These commands may require sudo privileges that might not be available
-            
+
             // Set ownership
             $chown_result = @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
             if ($chown_result !== null && strpos($chown_result, 'Operation not permitted') === false) {
@@ -492,17 +552,17 @@ switch ($action) {
             } else {
                 \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Unable to update ownership (may require elevated privileges)");
             }
-            
+
             // Set directory permissions to 755
             $chmod_dir_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type d -exec chmod 755 {} \\; 2>&1");
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Directory permissions set to 755");
-            
+
             // Set file permissions to 644
             $chmod_file_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: File permissions set to 644");
-            
+
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Module updated: $old_commit -> $new_commit");
-            
+
             $response = [
                 'status' => true,
                 'old_commit' => $old_commit,
@@ -514,26 +574,26 @@ switch ($action) {
             $response['message'] = 'Git pull failed: ' . $pull_output;
         }
         break;
-    
+
     case 'restart_pbx':
         $restart_type = isset($_POST['type']) ? $_POST['type'] : 'reload';
-        
+
         if (!in_array($restart_type, ['reload', 'restart'])) {
             $response = ['status' => false, 'message' => 'Invalid restart type'];
             break;
         }
-        
+
         // Use explicit whitelist approach for security
         if ($restart_type === 'reload') {
             $command = 'fwconsole reload';
         } else {
             $command = 'fwconsole restart';
         }
-        
+
         $output = [];
         $return_var = 0;
         exec($command . ' 2>&1', $output, $return_var);
-        
+
         if ($return_var === 0) {
             $response = [
                 'status' => true,

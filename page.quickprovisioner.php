@@ -14,12 +14,26 @@ if (!qp_is_local_network()) {
 
 if (!defined('FREEPBX_IS_AUTH')) { die('No direct script access allowed'); }
 
+// Verify FreePBX Core is available
+if (!class_exists('FreePBX') || !\FreePBX::Core()) {
+    die('FreePBX Core not available. Please ensure FreePBX is properly installed.');
+}
+
 $devices = \FreePBX::Database()->query("SELECT * FROM quickprovisioner_devices ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 $extensions = [];
-$users = \FreePBX::Core()->getAllUsers();
-foreach ($users as $user) {
-    $extensions[] = $user['extension'];
+try {
+    $users = \FreePBX::Core()->getAllUsers();
+    if ($users && is_array($users)) {
+        foreach ($users as $user) {
+            if (isset($user['extension'])) {
+                $extensions[] = $user['extension'];
+            }
+        }
+    }
+} catch (Exception $e) {
+    // Log error but don't stop execution
+    error_log("Quick Provisioner: Failed to fetch extensions - " . $e->getMessage());
 }
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -48,7 +62,7 @@ $csrf_token = $_SESSION['qp_csrf'];
             <button class="btn btn-success" onclick="newDevice()">Add New</button>
             <button class="btn btn-default" onclick="loadDevices()">Refresh</button>
             <table class="table table-striped" style="margin-top:15px;">
-                <thead><tr><th>MAC</th><th>Extension</th><th>Model</th><th>Actions</th></tr></thead>
+                <thead><tr><th>MAC</th><th>Extension</th><th>Secret</th><th>Model</th><th>Actions</th></tr></thead>
                 <tbody id="deviceListBody"></tbody>
             </table>
         </div>
@@ -57,22 +71,74 @@ $csrf_token = $_SESSION['qp_csrf'];
             <form id="deviceForm">
                 <input type="hidden" id="deviceId">
                 <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                <input type="hidden" id="extension" name="extension">
                 <div class="row">
                     <div class="col-md-4">
-                        <div class="form-group"><label>MAC Address</label><input type="text" id="mac" class="form-control" required></div>
-                        <div class="form-group"><label>Extension</label>
-                            <select id="extension" class="form-control" required onchange="loadSipSecret()">
-                                <?php foreach ($extensions as $ext): ?>
-                                    <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                        <div class="form-group">
+                            <label>Extension Number</label>
+                            <div id="extension_select_wrapper">
+                                <div class="input-group">
+                                    <select id="extension_select" class="form-control" required onchange="extensionSelectChanged()">
+                                        <option value="">-- Select Extension --</option>
+                                        <?php foreach ($extensions as $ext): ?>
+                                            <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Toggle custom extension input">
+                                            <i class="fa fa-edit"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="extension_custom_wrapper" style="display:none;">
+                                <div class="input-group">
+                                    <input type="text" id="extension_custom" class="form-control" placeholder="Enter custom extension" onchange="customExtensionChanged()">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Back to dropdown">
+                                            <i class="fa fa-list"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <small class="text-muted">Select from FreePBX extensions or enter a custom value</small>
                         </div>
                         <div class="form-group">
-                            <label>SIP Secret (Preview)</label>
-                            <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to load">
-                            <button type="button" class="btn btn-sm btn-default" onclick="copyToClipboard('sip_secret_preview')">Copy</button>
-                            <small class="text-muted">Unmasked for admin verification. Only visible to logged-in users.</small>
+                            <label>SIP Secret</label>
+                            <div id="secret_preview_wrapper">
+                                <div class="input-group">
+                                    <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
+                                            <i class="fa fa-copy"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret for reference">
+                                            <i class="fa fa-edit"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="secret_custom_wrapper" style="display:none;">
+                                <div class="input-group">
+                                    <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret (for reference only)">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
+                                            <i class="fa fa-refresh"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <small class="text-muted">Auto-fetched from FreePBX or enter manually for reference (not stored)</small>
                         </div>
+                        <hr>
+                        <div class="form-group"><label>Model</label>
+                            <select id="model" class="form-control" onchange="loadProfile(); updatePageSelect(); renderPreview(); showModelNotes(); loadDeviceOptions();">
+                                <!-- Populated by loadTemplates() -->
+                            </select>
+                        </div>
+                        <div id="modelNotes" style="margin-bottom:15px; color:#666;"></div>
+                        <hr>
+                        <div class="form-group"><label>MAC Address</label><input type="text" id="mac" class="form-control" required></div>
                         <hr>
                         <h4>Remote Provisioning Authentication</h4>
                         <div class="form-group">
@@ -89,13 +155,6 @@ $csrf_token = $_SESSION['qp_csrf'];
                                 </span>
                             </div>
                         </div>
-                        <hr>
-                        <div class="form-group"><label>Model</label>
-                            <select id="model" class="form-control" onchange="loadProfile(); updatePageSelect(); renderPreview(); showModelNotes(); loadDeviceOptions();">
-                                <!-- Populated by loadTemplates() -->
-                            </select>
-                        </div>
-                        <div id="modelNotes" style="margin-bottom:15px; color:#666;"></div>
                         <hr>
                         <div class="form-group"><label>Wallpaper</label>
                             <div class="input-group">
@@ -178,7 +237,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                 <tbody id="templatesList"></tbody>
             </table>
         </div>
-        
+
         <div id="tab-admin" class="tab-pane fade">
             <!-- PBX Controls Panel -->
             <div class="panel panel-primary">
@@ -189,14 +248,14 @@ $csrf_token = $_SESSION['qp_csrf'];
                     <p class="text-info">
                         <i class="fa fa-info-circle"></i> Use these controls to apply configuration changes or restart the PBX.
                     </p>
-                    
+
                     <div class="form-group">
                         <button class="btn btn-success" onclick="reloadPBX()">
                             <i class="fa fa-refresh"></i> Reload Config
                         </button>
                         <span class="text-muted">Apply configuration changes without interrupting calls</span>
                     </div>
-                    
+
                     <div class="form-group">
                         <button class="btn btn-warning" onclick="restartPBX()">
                             <i class="fa fa-power-off"></i> Restart PBX
@@ -205,9 +264,9 @@ $csrf_token = $_SESSION['qp_csrf'];
                             <i class="fa fa-exclamation-triangle"></i> <strong>Warning:</strong> This will briefly interrupt active calls!
                         </span>
                     </div>
-                    
+
                     <hr>
-                    
+
                     <div id="pbxStatus" style="margin-top: 15px;"></div>
                 </div>
             </div>
@@ -224,20 +283,20 @@ $csrf_token = $_SESSION['qp_csrf'];
                     <div class="form-group">
                         <strong>Git Commit:</strong> <span id="currentCommit">Loading...</span>
                     </div>
-                    
+
                     <button class="btn btn-primary" onclick="checkForUpdates()" id="checkUpdatesBtn">
                         Check for Updates
                     </button>
-                    
+
                     <div id="updateStatus" style="margin-top: 15px; display: none;">
                         <div id="updateStatusMessage"></div>
-                        
+
                         <div id="changelogSection" style="margin-top: 15px; display: none;">
                             <h4>Changelog:</h4>
                             <div class="list-group" id="changelogList" style="max-height: 300px; overflow-y: auto;">
                                 <!-- Changelog items will be inserted here -->
                             </div>
-                            
+
                             <div style="margin-top: 15px;">
                                 <p><strong>Do you want to update?</strong></p>
                                 <button class="btn btn-success" onclick="performUpdate()" id="confirmUpdateBtn">
@@ -249,7 +308,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                             </div>
                         </div>
                     </div>
-                    
+
                     <div id="updateResult" style="margin-top: 15px; display: none;"></div>
                 </div>
             </div>
@@ -311,11 +370,31 @@ var currentDeviceId = null;
 var profiles = {};
 
 function loadDevices() {
-    $('#deviceListBody').html('');
-    <?php foreach ($devices as $d): ?>
-        var row = '<tr><td>' + <?= json_encode($d["mac"]) ?> + '</td><td>' + <?= json_encode($d["extension"]) ?> + '</td><td>' + <?= json_encode($d["model"]) ?> + '</td><td><button onclick="editDevice(<?= $d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= $d["id"] ?>)">Delete</button></td></tr>';
-        $('#deviceListBody').append(row);
-    <?php endforeach; ?>
+    $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            $('#deviceListBody').html('');
+            r.devices.forEach(function(d) {
+                var secretDisplay = '';
+                if (d.secret) {
+                    // Display secret directly in plain text
+                    var escapedSecret = $('<div>').text(d.secret).html();
+                    secretDisplay = '<span>' + escapedSecret + '</span>';
+                } else {
+                    secretDisplay = '<span class="text-muted">N/A</span>';
+                }
+                var mac = $('<div>').text(d.mac).html();
+                var ext = $('<div>').text(d.extension).html();
+                var model = $('<div>').text(d.model).html();
+                var row = '<tr><td>' + mac + '</td><td>' + ext + '</td><td>' + secretDisplay + '</td><td>' + model + '</td><td><button class="btn btn-sm btn-default" onclick="editDevice(' + d.id + ')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')">Delete</button></td></tr>';
+                $('#deviceListBody').append(row);
+            });
+        } else {
+            var errorMsg = $('<div>').text(r.message || 'Unknown error').html();
+            $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Error loading devices: ' + errorMsg + '</td></tr>');
+        }
+    }, 'json').fail(function() {
+        $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Failed to load devices</td></tr>');
+    });
 }
 
 function editDevice(id) {
@@ -325,8 +404,30 @@ function editDevice(id) {
             var d = r.data;
             $('#deviceId').val(d.id);
             $('#mac').val(d.mac);
-            $('#extension').val(d.extension);
-            loadSipSecret();  // Load secret after extension set
+
+            // Handle extension - check if it's a FreePBX extension or custom
+            var extensionFound = false;
+            $('#extension_select option').each(function() {
+                if ($(this).val() === d.extension) {
+                    extensionFound = true;
+                    return false;
+                }
+            });
+
+            if (extensionFound) {
+                $('#extension_select').val(d.extension);
+                $('#extension').val(d.extension);
+                $('#extension_select_wrapper').show();
+                $('#extension_custom_wrapper').hide();
+            } else {
+                // Custom extension
+                $('#extension_custom').val(d.extension);
+                $('#extension').val(d.extension);
+                $('#extension_select_wrapper').hide();
+                $('#extension_custom_wrapper').show();
+            }
+
+            loadSipSecret(); // Load secret after extension set
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
@@ -361,7 +462,15 @@ function deleteDevice(id) {
 function newDevice() {
     $('#deviceForm')[0].reset();
     $('#deviceId').val('');
+    $('#extension_select').val('');
+    $('#extension').val('');
+    $('#extension_custom').val('');
+    $('#extension_select_wrapper').show();
+    $('#extension_custom_wrapper').hide();
     $('#sip_secret_preview').val('');
+    $('#sip_secret_custom').val('');
+    $('#secret_preview_wrapper').show();
+    $('#secret_custom_wrapper').hide();
     $('#prov_username').val('');
     $('#prov_password').val('');
     currentKeys = [];
@@ -611,6 +720,12 @@ function showExampleJSON() {
     $('#driverInput').val(example);
 }
 
+function extensionSelectChanged() {
+    var ext = $('#extension_select').val();
+    $('#extension').val(ext);
+    loadSipSecret();
+}
+
 function loadSipSecret() {
     var ext = $('#extension').val();
     if (!ext) {
@@ -630,13 +745,82 @@ function loadSipSecret() {
     }, 'json');
 }
 
+function toggleCustomExtension() {
+    var selectWrapper = $('#extension_select_wrapper');
+    var customWrapper = $('#extension_custom_wrapper');
+    if (customWrapper.is(':visible')) {
+        // Switch back to dropdown
+        customWrapper.hide();
+        selectWrapper.show();
+        var ext = $('#extension_select').val();
+        $('#extension').val(ext);
+        loadSipSecret();
+    } else {
+        // Switch to custom input
+        selectWrapper.hide();
+        customWrapper.show();
+        $('#extension_custom').focus();
+        $('#extension').val($('#extension_custom').val());
+        $('#sip_secret_preview').val('');
+    }
+}
+
+function customExtensionChanged() {
+    var ext = $('#extension_custom').val();
+    $('#extension').val(ext);
+    // Clear secret when custom extension is changed
+    $('#sip_secret_preview').val('');
+}
+
+function toggleCustomSecret() {
+    var previewWrapper = $('#secret_preview_wrapper');
+    var customWrapper = $('#secret_custom_wrapper');
+    if (customWrapper.is(':visible')) {
+        // Switch back to auto-fetch
+        customWrapper.hide();
+        previewWrapper.show();
+        loadSipSecret();
+    } else {
+        // Switch to custom input (for reference only, not stored)
+        previewWrapper.hide();
+        customWrapper.show();
+        $('#sip_secret_custom').focus();
+    }
+}
+
 function copyToClipboard(id) {
     var text = document.getElementById(id).value;
-    navigator.clipboard.writeText(text).then(function() {
+    if (!text) {
+        alert('No secret to copy.');
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Copied to clipboard!');
+        }).catch(function(err) {
+            // Fallback: create temporary textarea
+            fallbackCopyToClipboard(text);
+        });
+    } else {
+        // Fallback for non-HTTPS or unsupported browsers
+        fallbackCopyToClipboard(text);
+    }
+}
+
+function fallbackCopyToClipboard(text) {
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
         alert('Copied to clipboard!');
-    }).catch(function() {
-        alert('Copy failed.');
-    });
+    } catch (err) {
+        alert('Copy failed. Please copy manually: ' + text);
+    }
+    document.body.removeChild(textarea);
 }
 
 function generateProvPassword() {
@@ -784,12 +968,22 @@ function uploadAsset() {
 
 $('#deviceForm').submit(function(e) {
     e.preventDefault();
+
+    // Validate extension field
+    var extension = $('#extension').val();
+    if (!extension) {
+        alert('Please select or enter an extension');
+        return;
+    }
+
+    // Prepare form data
     var data = {
         action: 'save_device',
         data: $(this).serialize(),
         keys_json: JSON.stringify(currentKeys),
         contacts_json: JSON.stringify(currentContacts)
     };
+
     $.post('ajax.quickprovisioner.php', data, function(r) {
         if (r.status) {
             alert('Saved!');
@@ -809,17 +1003,17 @@ function checkForUpdates() {
     $('#checkUpdatesBtn').prop('disabled', true).text('Checking...');
     $('#updateStatus').hide();
     $('#updateResult').hide();
-    
+
     $.post('ajax.quickprovisioner.php', {
         action: 'check_updates',
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
         $('#checkUpdatesBtn').prop('disabled', false).text('Check for Updates');
-        
+
         if (r.status) {
             $('#currentCommit').text(r.current_commit.substring(0, 7));
             $('#updateStatus').show();
-            
+
             if (r.has_updates) {
                 $('#updateStatusMessage').html('<div class="alert alert-info"><strong>⬆️ Updates Available!</strong><br>New version available: ' + r.remote_commit.substring(0, 7) + '</div>');
                 loadChangelog(r.current_commit, r.remote_commit);
@@ -871,17 +1065,17 @@ function performUpdate() {
     if (!confirm('Are you sure you want to update? This will pull the latest changes from GitHub.')) {
         return;
     }
-    
+
     $('#confirmUpdateBtn').prop('disabled', true).text('Updating...');
     $('#changelogSection').hide();
     $('#updateStatusMessage').html('<div class="alert alert-info">Updating... Please wait...</div>');
-    
+
     $.post('ajax.quickprovisioner.php', {
         action: 'perform_update',
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
         $('#confirmUpdateBtn').prop('disabled', false).text('Yes, Update Now');
-        
+
         if (r.status) {
             var msg = '<div class="alert alert-success">';
             msg += '<strong>✅ Updated successfully!</strong><br>';
@@ -893,7 +1087,7 @@ function performUpdate() {
             msg += '</div>';
             $('#updateResult').html(msg).show();
             $('#updateStatus').hide();
-            
+
             // Update current commit display
             $('#currentCommit').text(r.new_commit.substring(0, 7));
             if (r.new_version) {
@@ -925,7 +1119,7 @@ function formatTimeAgo(date) {
         hour: 3600,
         minute: 60
     };
-    
+
     for (var key in intervals) {
         var interval = Math.floor(seconds / intervals[key]);
         if (interval >= 1) {
@@ -949,9 +1143,9 @@ function escapeHtml(text) {
 // PBX Control Functions
 function reloadPBX() {
     if (!confirm('Apply configuration changes? This will not interrupt calls.')) return;
-    
+
     $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Reloading...');
-    
+
     $.post('ajax.quickprovisioner.php', {
         action: 'restart_pbx',
         type: 'reload',
@@ -967,9 +1161,9 @@ function reloadPBX() {
 
 function restartPBX() {
     if (!confirm('Are you sure you want to restart the PBX?\n\nThis will briefly interrupt any active calls!')) return;
-    
+
     $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Restarting PBX...');
-    
+
     $.post('ajax.quickprovisioner.php', {
         action: 'restart_pbx',
         type: 'restart',
