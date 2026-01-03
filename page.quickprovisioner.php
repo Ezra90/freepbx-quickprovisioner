@@ -1076,6 +1076,26 @@ $('#deviceForm').submit(function(e) {
         return;
     }
 
+    // Validate required configurable options
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.configurable_options) {
+        var missingRequired = [];
+        profile.configurable_options.forEach(function(opt) {
+            if (opt.required) {
+                var fieldValue = $('[name="custom_options[' + opt.name + ']"]').val();
+                if (!fieldValue || fieldValue.trim() === '') {
+                    missingRequired.push(opt.label);
+                }
+            }
+        });
+        
+        if (missingRequired.length > 0) {
+            alert('Please fill in the following required fields:\n\n• ' + missingRequired.join('\n• '));
+            return;
+        }
+    }
+
     // Prepare form data
     var data = {
         action: 'save_device',
