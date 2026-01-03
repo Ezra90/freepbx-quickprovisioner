@@ -292,6 +292,50 @@ $csrf_token = $_SESSION['qp_csrf'];
                                             </div>
                                         </div>
 
+                                        <!-- Auto Provisioning Settings -->
+                                        <div class="panel panel-default" style="margin-top:20px;">
+                                            <div class="panel-heading">
+                                                <strong>Auto Provisioning Settings</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <div class="form-group">
+                                                    <label>Auto Provisioning Server URL</label>
+                                                    <input type="text" name="custom_options[auto_provision.server.url]" id="autoProvisionUrl" class="form-control" placeholder="http://your-pbx-server/path">
+                                                    <small class="text-muted">URL where the phone will check for configuration updates. Pre-filled with FreePBX domain.</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Auto Provision Mode</label>
+                                                    <select name="custom_options[auto_provision.mode]" class="form-control">
+                                                        <option value="">-- Select Mode --</option>
+                                                        <option value="0">Disabled - Manual provisioning only</option>
+                                                        <option value="1">Power On - Check on boot only</option>
+                                                        <option value="2">Periodic - Check at regular intervals</option>
+                                                        <option value="6">Power On + Periodic - Check on boot and periodically</option>
+                                                    </select>
+                                                    <small class="text-muted">Controls when the phone checks for configuration updates.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- SIP Server Settings -->
+                                        <div class="panel panel-default">
+                                            <div class="panel-heading">
+                                                <strong>SIP Server Settings</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <div class="form-group">
+                                                    <label>SIP Server Host</label>
+                                                    <input type="text" name="custom_options[sip_server.host]" class="form-control" placeholder="FreePBX domain or IP">
+                                                    <small class="text-muted">Leave blank to use FreePBX server. Override for remote scenarios.</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>SIP Server Port</label>
+                                                    <input type="number" name="custom_options[sip_server.port]" class="form-control" placeholder="5060" min="1" max="65535">
+                                                    <small class="text-muted">Default: 5060. Change if using custom SIP port.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <!-- Device Options from Template -->
                                         <div id="deviceOptions" style="margin-top:20px;">
                                             <!-- Populated by loadDeviceOptions() -->
@@ -757,6 +801,7 @@ function loadProfile() {
                 updatePageSelect();
                 updateRightColumnHeader();
                 updateScreenDimensions();
+                prefillAutoProvisionUrl();
                 renderPreview();
                 updateHandsetSettingsPreview();
                 loadAssetGallery();
@@ -1462,6 +1507,16 @@ function updateHandsetSettingsPreview() {
     }
     
     $('#liveConfigPreview').val(preview);
+}
+
+// Pre-fill auto provisioning URL with current server
+function prefillAutoProvisionUrl() {
+    if (!$('#autoProvisionUrl').val()) {
+        var protocol = window.location.protocol;
+        var host = window.location.host;
+        var suggestedUrl = protocol + '//' + host + '/admin/modules/quickprovisioner/provision.php';
+        $('#autoProvisionUrl').attr('placeholder', suggestedUrl);
+    }
 }
 
 // Smart Dial Shortcuts Management
