@@ -16,7 +16,7 @@ function qp_safe_write($filepath, $content) {
     $dir = dirname($filepath);
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0775, true)) {
-            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
+            return ['status' => false, 'message' => 'Failed to create directory'];
         }
     }
     if (file_put_contents($filepath, $content) === false) {
@@ -40,7 +40,7 @@ function qp_safe_move_upload($tmp_file, $target) {
     $dir = dirname($target);
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0775, true)) {
-            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
+            return ['status' => false, 'message' => 'Failed to create directory'];
         }
     }
     if (!move_uploaded_file($tmp_file, $target)) {
@@ -265,7 +265,7 @@ switch ($action) {
         $json = $_POST['json'] ?? '';
         $data = json_decode($json, true);
         if ($data === null || json_last_error() !== JSON_ERROR_NONE || empty($data['model'])) {
-            $response['message'] = 'Invalid JSON or no model field: ' . json_last_error_msg();
+            $response['message'] = 'Invalid JSON or missing model field';
             break;
         }
         $model = basename($data['model']); // Sanitize to prevent path traversal
