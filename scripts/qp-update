@@ -60,10 +60,14 @@ fi
 
 VERSION=$(grep -oP '(?<=<version>)[^<]+' "$MODULE_DIR/module.xml" 2>/dev/null | head -1)
 
-if [ $UPDATES_APPLIED -eq 1 ]; then
+if [ "$UPDATES_APPLIED" -eq 1 ]; then
     echo ""
     echo "Restarting FreePBX..."
-    fwconsole restart
+    if fwconsole restart; then
+        echo "FreePBX restarted successfully."
+    else
+        echo "Warning: FreePBX restart failed. Please restart manually."
+    fi
     echo ""
 fi
 
