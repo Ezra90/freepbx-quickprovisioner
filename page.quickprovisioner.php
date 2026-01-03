@@ -566,10 +566,17 @@ function newDevice() {
     $('#secret_custom_wrapper').hide();
     $('#prov_username').val('');
     $('#prov_password').val('');
+    $('#wallpaper').val('');
+    $('#wallpaperPreview').hide();
+    $('#wallpaper_mode').val('crop');
     currentKeys = [];
     currentContacts = [];
     currentDeviceId = null;
+    $('#templateHeader').text('Select a model to load template settings');
+    $('#handsetSettingsContent').html('<p class="text-muted">Select a model to view handset settings.</p>');
+    $('#phoneAssetsContent').html('<p class="text-muted">Select a model to manage phone assets.</p>');
     renderPreview();
+    updateAccountSetupPreview();
 }
 
 function loadTemplates() {
@@ -1540,6 +1547,11 @@ function renderHandsetSettings() {
 
 // Update Account Setup Live Preview
 function updateAccountSetupPreview() {
+    // Check if element exists first
+    if ($('#accountSetupPreview').length === 0) {
+        return;
+    }
+    
     var ext = $('#extension').val();
     var secret = $('#sip_secret_preview').val();
     var displayName = ext; // Can be enhanced to fetch actual display name
