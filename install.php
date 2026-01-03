@@ -61,6 +61,7 @@ $module_path = __DIR__;
 $directories = [
     $module_path . '/assets',
     $module_path . '/assets/uploads',
+    $module_path . '/templates',
 ];
 
 foreach ($directories as $dir) {
@@ -93,6 +94,25 @@ if (is_dir($uploads_dir)) {
         $htaccess_content .= "Options -ExecCGI -Indexes\n";
         $htaccess_content .= "AddType text/plain .php .php3 .phtml .pht\n";
         @file_put_contents($htaccess_path, $htaccess_content);
+    }
+}
+
+// Protect templates directory
+$templates_dir = $module_path . '/templates';
+if (is_dir($templates_dir)) {
+    @chmod($templates_dir, 0755);
+
+    // Create .htaccess for templates directory to prevent direct execution
+    $htaccess_path = $templates_dir . '/.htaccess';
+    if (!file_exists($htaccess_path)) {
+        $htaccess_content = "# Quick Provisioner - Protect templates directory\n";
+        $htaccess_content .= "php_flag engine off\n";
+        $htaccess_content .= "Options -ExecCGI -Indexes\n";
+        $htaccess_content .= "AddType text/plain .php .php3 .phtml .pht .json\n";
+        @file_put_contents($htaccess_path, $htaccess_content);
+        if (class_exists('FreePBX')) {
+            FreePBX::create()->Logger->log("Quick Provisioner: Created .htaccess for templates directory");
+        }
     }
 }
 

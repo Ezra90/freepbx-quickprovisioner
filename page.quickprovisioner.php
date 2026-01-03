@@ -77,13 +77,13 @@ $csrf_token = $_SESSION['qp_csrf'];
                         <h4>Remote Provisioning Authentication</h4>
                         <div class="form-group">
                             <label>Provisioning Username</label>
-                            <input type="text" id="prov_username" class="form-control" placeholder="Optional: For remote provisioning auth">
-                            <small class="text-muted">Leave empty to disable auth from remote networks</small>
+                            <input type="text" id="prov_username" class="form-control" placeholder="Required for remote provisioning">
+                            <small class="text-muted">Remote provisioning requires per-device credentials. Devices must send HTTP Basic Auth when retrieving configs or media.</small>
                         </div>
                         <div class="form-group">
                             <label>Provisioning Password</label>
                             <div class="input-group">
-                                <input type="text" id="prov_password" class="form-control" placeholder="Optional: For remote provisioning auth">
+                                <input type="text" id="prov_password" class="form-control" placeholder="Required for remote provisioning">
                                 <span class="input-group-btn">
                                     <button type="button" class="btn btn-default" onclick="generateProvPassword()">Generate</button>
                                 </span>

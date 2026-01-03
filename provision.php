@@ -27,19 +27,30 @@ if (!$device) {
 
 // Check authentication for remote access
 if (!qp_is_local_network()) {
+    // Log warning if remote provisioning over HTTP
+    if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] !== 'on') {
+        \FreePBX::create()->Logger->log("WARNING: Remote provisioning over HTTP (non-HTTPS) for MAC: $mac");
+    }
+    
     $prov_user = $device['prov_username'] ?? '';
     $prov_pass = $device['prov_password'] ?? '';
     
-    if (!empty($prov_user) && !empty($prov_pass)) {
-        $auth_user = $_SERVER['PHP_AUTH_USER'] ?? '';
-        $auth_pass = $_SERVER['PHP_AUTH_PW'] ?? '';
-        
-        if ($auth_user !== $prov_user || $auth_pass !== $prov_pass) {
-            header('WWW-Authenticate: Basic realm="Phone Provisioning"');
-            header('HTTP/1.0 401 Unauthorized');
-            \FreePBX::create()->Logger->log("Unauthorized provisioning attempt for MAC: $mac");
-            die('Authentication required');
-        }
+    // Always require credentials for remote access
+    if (empty($prov_user) || empty($prov_pass)) {
+        header('WWW-Authenticate: Basic realm="Phone Provisioning"');
+        header('HTTP/1.0 401 Unauthorized');
+        \FreePBX::create()->Logger->log("Remote provisioning denied - no credentials configured for MAC: $mac");
+        die('Authentication required');
+    }
+    
+    $auth_user = $_SERVER['PHP_AUTH_USER'] ?? '';
+    $auth_pass = $_SERVER['PHP_AUTH_PW'] ?? '';
+    
+    if ($auth_user !== $prov_user || $auth_pass !== $prov_pass) {
+        header('WWW-Authenticate: Basic realm="Phone Provisioning"');
+        header('HTTP/1.0 401 Unauthorized');
+        \FreePBX::create()->Logger->log("Unauthorized provisioning attempt for MAC: $mac");
+        die('Authentication required');
     }
 }
 
@@ -74,11 +85,8 @@ $wpUrl = "";
 if (!empty($device['wallpaper'])) {
     $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
     $host = $_SERVER['HTTP_HOST'];
-    $auth = "";
-    if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
-        $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
-    }
-    $wpUrl = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?mac=$mac";
+    // Do not embed credentials in URL - device will authenticate via Basic Auth headers
+    $wpUrl = "$protocol://$host/admin/modules/quickprovisioner/media.php?mac=$mac";
 }
 
 $lockEnable = !empty($device['security_pin']) ? 1 : 0;
@@ -147,11 +155,8 @@ if (preg_match('/{{contacts_loop}}(.*?){{\/contacts_loop}}/s', $template, $match
         if (!empty($c['photo'])) {
             $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
             $host = $_SERVER['HTTP_HOST'];
-            $auth = "";
-            if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
-                $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
-            }
-            $photo_url = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=$mac&w=100&h=100&mode=crop";
+            // Do not embed credentials in URL - device will authenticate via Basic Auth headers
+            $photo_url = "$protocol://$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=$mac&w=100&h=100&mode=crop";
         }
         $item = str_replace('{{photo_url}}', $photo_url, $item);
         $builtLoop .= $item;

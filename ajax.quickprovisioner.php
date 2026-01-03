@@ -152,11 +152,8 @@ switch ($action) {
         if (!empty($device['wallpaper'])) {
             $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
             $host = $_SERVER['HTTP_HOST'];
-            $auth = "";
-            if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
-                $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
-            }
-            $wpUrl = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?mac=" . strtoupper(preg_replace('/[^A-F0-9]/', '', $device['mac']));
+            // Do not embed credentials in URL - device will authenticate via Basic Auth headers
+            $wpUrl = "$protocol://$host/admin/modules/quickprovisioner/media.php?mac=" . strtoupper(preg_replace('/[^A-F0-9]/', '', $device['mac']));
         }
         $vars = [
             '{{mac}}' => strtoupper(preg_replace('/[^A-F0-9]/', '', $device['mac'])),
@@ -215,11 +212,8 @@ switch ($action) {
                 if (!empty($c['photo'])) {
                     $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
                     $host = $_SERVER['HTTP_HOST'];
-                    $auth = "";
-                    if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
-                        $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
-                    }
-                    $photo_url = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=" . $vars['{{mac}}'] . "&w=100&h=100&mode=crop";
+                    // Do not embed credentials in URL - device will authenticate via Basic Auth headers
+                    $photo_url = "$protocol://$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=" . $vars['{{mac}}'] . "&w=100&h=100&mode=crop";
                 }
                 $item = str_replace('{{photo_url}}', $photo_url, $item);
                 $builtLoop .= $item;
@@ -373,8 +367,14 @@ switch ($action) {
             }
         }
         
-        // Set SSH key for git operations
-        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        // Set SSH key for git operations if it exists
+        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
+        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
+            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+        } else {
+            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+        }
         
         // Fetch from origin
         $fetch_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git fetch origin main 2>&1");
@@ -408,8 +408,14 @@ switch ($action) {
             break;
         }
         
-        // Set SSH key for git operations
-        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        // Set SSH key for git operations if it exists
+        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
+        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
+            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+        } else {
+            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+        }
         
         // Get list of commits between current and remote
         $log_cmd = sprintf(
@@ -449,8 +455,14 @@ switch ($action) {
         // Get current commit before update
         $old_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
         
-        // Set SSH key for git operations
-        putenv('GIT_SSH_COMMAND=ssh -i /home/hhvoip/.ssh/id_github -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+        // Set SSH key for git operations if it exists
+        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
+        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
+            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            \FreePBX::create()->Logger->log("Quick Provisioner: Using SSH key: $ssh_key_path");
+        } else {
+            \FreePBX::create()->Logger->log("Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
+        }
         
         // Perform git pull
         $pull_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git pull origin main 2>&1");
@@ -470,12 +482,24 @@ switch ($action) {
                 }
             }
             
-            // Fix permissions
+            // Fix permissions with targeted approach
             // Note: These commands may require sudo privileges that might not be available
-            // Using @ to suppress errors if they fail
-            @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
-            @shell_exec("chmod -R 755 " . escapeshellarg($module_dir) . " 2>&1");
-            @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
+            
+            // Set ownership
+            $chown_result = @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
+            if ($chown_result !== null && strpos($chown_result, 'Operation not permitted') === false) {
+                \FreePBX::create()->Logger->log("Quick Provisioner: Ownership updated successfully");
+            } else {
+                \FreePBX::create()->Logger->log("Quick Provisioner: Unable to update ownership (may require elevated privileges)");
+            }
+            
+            // Set directory permissions to 755
+            $chmod_dir_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type d -exec chmod 755 {} \\; 2>&1");
+            \FreePBX::create()->Logger->log("Quick Provisioner: Directory permissions set to 755");
+            
+            // Set file permissions to 644
+            $chmod_file_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
+            \FreePBX::create()->Logger->log("Quick Provisioner: File permissions set to 644");
             
             \FreePBX::create()->Logger->log("Module updated: $old_commit -> $new_commit");
             
