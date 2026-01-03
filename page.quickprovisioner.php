@@ -146,6 +146,48 @@ $csrf_token = $_SESSION['qp_csrf'];
                 <thead><tr><th>Model</th><th>Display Name</th><th>Actions</th></tr></thead>
                 <tbody id="templatesList"></tbody>
             </table>
+            
+            <!-- Update Panel -->
+            <div class="panel panel-info" style="margin-top: 30px;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">🔄 Module Updates</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <strong>Current Version:</strong> <span id="currentVersion">2.1.0</span>
+                    </div>
+                    <div class="form-group">
+                        <strong>Git Commit:</strong> <span id="currentCommit">Loading...</span>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="checkForUpdates()" id="checkUpdatesBtn">
+                        Check for Updates
+                    </button>
+                    
+                    <div id="updateStatus" style="margin-top: 15px; display: none;">
+                        <div id="updateStatusMessage"></div>
+                        
+                        <div id="changelogSection" style="margin-top: 15px; display: none;">
+                            <h4>Changelog:</h4>
+                            <div class="list-group" id="changelogList" style="max-height: 300px; overflow-y: auto;">
+                                <!-- Changelog items will be inserted here -->
+                            </div>
+                            
+                            <div style="margin-top: 15px;">
+                                <p><strong>Do you want to update?</strong></p>
+                                <button class="btn btn-success" onclick="performUpdate()" id="confirmUpdateBtn">
+                                    Yes, Update Now
+                                </button>
+                                <button class="btn btn-default" onclick="cancelUpdate()" style="margin-left: 10px;">
+                                    No, Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="updateResult" style="margin-top: 15px; display: none;"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -572,6 +614,160 @@ $('#deviceForm').submit(function(e) {
 
 loadDevices();
 loadTemplates();
+
+// Update Management Functions
+function checkForUpdates() {
+    $('#checkUpdatesBtn').prop('disabled', true).text('Checking...');
+    $('#updateStatus').hide();
+    $('#updateResult').hide();
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'check_updates',
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        $('#checkUpdatesBtn').prop('disabled', false).text('Check for Updates');
+        
+        if (r.status) {
+            $('#currentCommit').text(r.current_commit.substring(0, 7));
+            $('#updateStatus').show();
+            
+            if (r.has_updates) {
+                $('#updateStatusMessage').html('<div class="alert alert-info"><strong>⬆️ Updates Available!</strong><br>New version available: ' + r.remote_commit.substring(0, 7) + '</div>');
+                loadChangelog(r.current_commit, r.remote_commit);
+            } else {
+                $('#updateStatusMessage').html('<div class="alert alert-success"><strong>✅ Up to Date</strong><br>You are running the latest version.</div>');
+                $('#changelogSection').hide();
+            }
+        } else {
+            $('#updateStatus').show();
+            $('#updateStatusMessage').html('<div class="alert alert-danger"><strong>Error:</strong> ' + (r.message || 'Failed to check for updates') + '</div>');
+        }
+    }, 'json').fail(function() {
+        $('#checkUpdatesBtn').prop('disabled', false).text('Check for Updates');
+        $('#updateStatus').show();
+        $('#updateStatusMessage').html('<div class="alert alert-danger"><strong>Error:</strong> Failed to check for updates. Please try again.</div>');
+    });
+}
+
+function loadChangelog(currentCommit, remoteCommit) {
+    $.post('ajax.quickprovisioner.php', {
+        action: 'get_changelog',
+        current_commit: currentCommit,
+        remote_commit: remoteCommit,
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status && r.commits && r.commits.length > 0) {
+            var html = '';
+            r.commits.forEach(function(commit) {
+                var date = new Date(commit.date);
+                var timeAgo = formatTimeAgo(date);
+                html += '<div class="list-group-item">';
+                html += '<strong>' + commit.hash.substring(0, 7) + '</strong> - ' + escapeHtml(commit.message);
+                html += '<br><small class="text-muted">' + escapeHtml(commit.author) + ', ' + timeAgo + '</small>';
+                html += '</div>';
+            });
+            $('#changelogList').html(html);
+            $('#changelogSection').show();
+        } else {
+            $('#changelogList').html('<div class="list-group-item">No changelog available</div>');
+            $('#changelogSection').show();
+        }
+    }, 'json').fail(function() {
+        $('#changelogList').html('<div class="list-group-item text-danger">Failed to load changelog</div>');
+        $('#changelogSection').show();
+    });
+}
+
+function performUpdate() {
+    if (!confirm('Are you sure you want to update? This will pull the latest changes from GitHub.')) {
+        return;
+    }
+    
+    $('#confirmUpdateBtn').prop('disabled', true).text('Updating...');
+    $('#changelogSection').hide();
+    $('#updateStatusMessage').html('<div class="alert alert-info">Updating... Please wait...</div>');
+    
+    $.post('ajax.quickprovisioner.php', {
+        action: 'perform_update',
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        $('#confirmUpdateBtn').prop('disabled', false).text('Yes, Update Now');
+        
+        if (r.status) {
+            var msg = '<div class="alert alert-success">';
+            msg += '<strong>✅ Updated successfully!</strong><br>';
+            msg += r.old_commit.substring(0, 7) + ' → ' + r.new_commit.substring(0, 7);
+            if (r.new_version) {
+                msg += '<br>New version: ' + r.new_version;
+            }
+            msg += '<br><br>' + escapeHtml(r.message || 'Please refresh the page to see changes.');
+            msg += '</div>';
+            $('#updateResult').html(msg).show();
+            $('#updateStatus').hide();
+            
+            // Update current commit display
+            $('#currentCommit').text(r.new_commit.substring(0, 7));
+            if (r.new_version) {
+                $('#currentVersion').text(r.new_version);
+            }
+        } else {
+            $('#updateResult').html('<div class="alert alert-danger"><strong>Error:</strong> ' + escapeHtml(r.message || 'Update failed') + '</div>').show();
+            $('#changelogSection').show();
+        }
+    }, 'json').fail(function() {
+        $('#confirmUpdateBtn').prop('disabled', false).text('Yes, Update Now');
+        $('#updateResult').html('<div class="alert alert-danger"><strong>Error:</strong> Update request failed. Please try again.</div>').show();
+        $('#changelogSection').show();
+    });
+}
+
+function cancelUpdate() {
+    $('#changelogSection').hide();
+    $('#updateStatus').hide();
+}
+
+function formatTimeAgo(date) {
+    var seconds = Math.floor((new Date() - date) / 1000);
+    var intervals = {
+        year: 31536000,
+        month: 2592000,
+        week: 604800,
+        day: 86400,
+        hour: 3600,
+        minute: 60
+    };
+    
+    for (var key in intervals) {
+        var interval = Math.floor(seconds / intervals[key]);
+        if (interval >= 1) {
+            return interval + ' ' + key + (interval > 1 ? 's' : '') + ' ago';
+        }
+    }
+    return 'just now';
+}
+
+function escapeHtml(text) {
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+// Load current commit on page load
+$(document).ready(function() {
+    $.post('ajax.quickprovisioner.php', {
+        action: 'check_updates',
+        csrf_token: '<?= $csrf_token ?>'
+    }, function(r) {
+        if (r.status && r.current_commit) {
+            $('#currentCommit').text(r.current_commit.substring(0, 7));
+        }
+    }, 'json');
+});
 </script>
 <?php
 ?>
