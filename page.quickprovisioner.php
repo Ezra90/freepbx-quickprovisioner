@@ -362,34 +362,76 @@ function loadDevices() {
             r.devices.forEach(function(d) {
                 var secretDisplay = '';
                 if (d.secret) {
-                    // Mask the secret but show first 4 chars
-                    var masked = d.secret.substring(0, 4) + '********';
-                    secretDisplay = '<span title="Click to reveal">' + masked + '</span> ';
-                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="revealSecret(\'' + d.secret + '\')"><i class="fa fa-eye"></i></button> ';
-                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="copySecretToClipboard(\'' + d.secret + '\')"><i class="fa fa-copy"></i></button>';
+                    // Show indicator that secret exists without revealing any characters
+                    secretDisplay = '<span class="text-success">••••••••</span> ';
+                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="revealSecret(' + d.id + ')" data-device-id="' + d.id + '" title="Reveal secret"><i class="fa fa-eye"></i></button> ';
+                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="copyDeviceSecret(' + d.id + ')" data-device-id="' + d.id + '" title="Copy secret"><i class="fa fa-copy"></i></button>';
                 } else {
                     secretDisplay = '<span class="text-muted">N/A</span>';
                 }
-                var row = '<tr><td>' + d.mac + '</td><td>' + d.extension + '</td><td>' + secretDisplay + '</td><td>' + d.model + '</td><td><button class="btn btn-sm btn-default" onclick="editDevice(' + d.id + ')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')">Delete</button></td></tr>';
+                var mac = $('<div>').text(d.mac).html();
+                var ext = $('<div>').text(d.extension).html();
+                var model = $('<div>').text(d.model).html();
+                var row = '<tr><td>' + mac + '</td><td>' + ext + '</td><td>' + secretDisplay + '</td><td>' + model + '</td><td><button class="btn btn-sm btn-default" onclick="editDevice(' + d.id + ')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')">Delete</button></td></tr>';
                 $('#deviceListBody').append(row);
             });
         } else {
-            $('#deviceListBody').html('<tr><td colspan="5">Error loading devices: ' + r.message + '</td></tr>');
+            var errorMsg = $('<div>').text(r.message || 'Unknown error').html();
+            $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Error loading devices: ' + errorMsg + '</td></tr>');
         }
     }, 'json').fail(function() {
-        $('#deviceListBody').html('<tr><td colspan="5">Failed to load devices</td></tr>');
+        $('#deviceListBody').html('<tr><td colspan="5" class="text-danger">Failed to load devices</td></tr>');
     });
 }
 
-function revealSecret(secret) {
-    alert('SIP Secret: ' + secret);
+function revealSecret(deviceId) {
+    // Fetch secret securely via AJAX
+    $.post('ajax.quickprovisioner.php', {action:'get_device_secret', id:deviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            // Use a modal instead of alert for better security
+            showSecretModal(r.secret);
+        } else {
+            alert('Error: ' + $('<div>').text(r.message).html());
+        }
+    }, 'json');
 }
 
-function copySecretToClipboard(secret) {
-    navigator.clipboard.writeText(secret).then(function() {
-        alert('Secret copied to clipboard!');
-    }).catch(function() {
-        alert('Copy failed.');
+function copyDeviceSecret(deviceId) {
+    // Fetch secret securely via AJAX before copying
+    $.post('ajax.quickprovisioner.php', {action:'get_device_secret', id:deviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(r.secret).then(function() {
+                    alert('Secret copied to clipboard!');
+                }).catch(function(err) {
+                    // Fallback for copy failure
+                    showSecretModal(r.secret, 'Copy failed. Please copy manually:');
+                });
+            } else {
+                // Fallback for non-HTTPS or unsupported browsers
+                showSecretModal(r.secret, 'Clipboard not available. Please copy manually:');
+            }
+        } else {
+            alert('Error: ' + $('<div>').text(r.message).html());
+        }
+    }, 'json');
+}
+
+function showSecretModal(secret, message) {
+    message = message || 'SIP Secret:';
+    var escapedSecret = $('<div>').text(secret).html();
+    var escapedMessage = $('<div>').text(message).html();
+    var modalHtml = '<div class="modal fade" id="secretModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">';
+    modalHtml += '<div class="modal-header"><h4 class="modal-title">' + escapedMessage + '</h4></div>';
+    modalHtml += '<div class="modal-body"><input type="text" class="form-control" value="' + escapedSecret + '" readonly onclick="this.select()"></div>';
+    modalHtml += '<div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">Close</button></div>';
+    modalHtml += '</div></div></div>';
+    // Remove any existing modal
+    $('#secretModal').remove();
+    $('body').append(modalHtml);
+    $('#secretModal').modal('show');
+    $('#secretModal').on('hidden.bs.modal', function() {
+        $(this).remove();
     });
 }
 
@@ -787,21 +829,36 @@ function toggleCustomSecret() {
 function copyToClipboard(id) {
     var text = document.getElementById(id).value;
     if (!text) {
-        // If preview is empty, try to get value from custom input
-        var customText = $('#sip_secret_custom').val();
-        if (customText) {
-            text = customText;
-        }
+        alert('No secret to copy.');
+        return;
     }
-    if (text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
             alert('Copied to clipboard!');
-        }).catch(function() {
-            alert('Copy failed.');
+        }).catch(function(err) {
+            // Fallback: create temporary textarea
+            fallbackCopyToClipboard(text);
         });
     } else {
-        alert('No secret to copy.');
+        // Fallback for non-HTTPS or unsupported browsers
+        fallbackCopyToClipboard(text);
     }
+}
+
+function fallbackCopyToClipboard(text) {
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        alert('Copied to clipboard!');
+    } catch (err) {
+        alert('Copy failed. Please copy manually: ' + text);
+    }
+    document.body.removeChild(textarea);
 }
 
 function generateProvPassword() {

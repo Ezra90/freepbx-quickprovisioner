@@ -119,17 +119,39 @@ switch ($action) {
         $devices = [];
         foreach ($rows as $row) {
             $ext = $row['extension'];
-            // Try to fetch secret from FreePBX
-            $secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+            // Try to fetch secret from FreePBX - check for null/false
+            $device = \FreePBX::Core()->getDevice($ext);
+            $secret = ($device && isset($device['secret'])) ? $device['secret'] : '';
             $devices[] = [
                 'id' => $row['id'],
                 'mac' => $row['mac'],
                 'extension' => $row['extension'],
                 'model' => $row['model'],
-                'secret' => $secret
+                'secret' => $secret ? '***' : '' // Only send indicator, not actual secret
             ];
         }
         $response = ['status' => true, 'devices' => $devices];
+        break;
+
+    case 'get_device_secret':
+        $id = $_REQUEST['id'] ?? null;
+        if (!$id || !is_numeric($id)) {
+            $response['message'] = 'Invalid device ID';
+            break;
+        }
+        $device = $db->getRow("SELECT extension FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
+        if (!$device) {
+            $response['message'] = 'Device not found';
+            break;
+        }
+        $ext = $device['extension'];
+        $freepbxDevice = \FreePBX::Core()->getDevice($ext);
+        $secret = ($freepbxDevice && isset($freepbxDevice['secret'])) ? $freepbxDevice['secret'] : '';
+        if ($secret) {
+            $response = ['status' => true, 'secret' => $secret];
+        } else {
+            $response['message'] = 'Secret not found for extension ' . $ext;
+        }
         break;
 
     case 'delete_device':
