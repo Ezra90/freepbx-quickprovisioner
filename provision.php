@@ -75,16 +75,27 @@ header("Content-Disposition: attachment; filename=\"$filename\"");
 
 $custom_options = json_decode($device['custom_options_json'], true) ?? [];
 $ext = $device['extension'];
-$userInfo = \FreePBX::Core()->getUser($ext);
-$display_name = $userInfo['name'] ?? $ext;
+$display_name = $ext;
+$secret = '';
+
+// Fetch display name
+try {
+    $userInfo = \FreePBX::Core()->getUser($ext);
+    $display_name = $userInfo['name'] ?? $ext;
+} catch (Exception $e) {
+    error_log("Quick Provisioner: Error fetching user info for extension $ext - " . $e->getMessage());
+}
 
 // Use custom secret if available, otherwise fetch from FreePBX
-$secret = '';
 if (!empty($device['custom_sip_secret'])) {
     $secret = $device['custom_sip_secret'];
 } else {
-    $deviceInfo = \FreePBX::Core()->getDevice($ext);
-    $secret = $deviceInfo['secret'] ?? '';
+    try {
+        $deviceInfo = \FreePBX::Core()->getDevice($ext);
+        $secret = $deviceInfo['secret'] ?? '';
+    } catch (Exception $e) {
+        error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
+    }
 }
 
 $server_ip = $_SERVER['SERVER_ADDR'];
