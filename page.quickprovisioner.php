@@ -57,41 +57,63 @@ $csrf_token = $_SESSION['qp_csrf'];
             <form id="deviceForm">
                 <input type="hidden" id="deviceId">
                 <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                <input type="hidden" id="extension" name="extension">
                 <div class="row">
                     <div class="col-md-4">
                         <div class="form-group">
                             <label>Extension Number</label>
-                            <div class="input-group">
-                                <select id="extension" class="form-control" required onchange="loadSipSecret()">
-                                    <option value="">-- Select Extension --</option>
-                                    <?php foreach ($extensions as $ext): ?>
-                                        <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
-                                    <?php endforeach; ?>
-                                    <option value="__custom__">Custom Extension</option>
-                                </select>
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Toggle custom extension input">
-                                        <i class="fa fa-edit"></i>
-                                    </button>
-                                </span>
+                            <div id="extension_select_wrapper">
+                                <div class="input-group">
+                                    <select id="extension_select" class="form-control" required onchange="extensionSelectChanged()">
+                                        <option value="">-- Select Extension --</option>
+                                        <?php foreach ($extensions as $ext): ?>
+                                            <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Toggle custom extension input">
+                                            <i class="fa fa-edit"></i>
+                                        </button>
+                                    </span>
+                                </div>
                             </div>
-                            <input type="text" id="extension_custom" class="form-control" placeholder="Enter custom extension" style="display:none; margin-top:5px;" onchange="customExtensionChanged()">
+                            <div id="extension_custom_wrapper" style="display:none;">
+                                <div class="input-group">
+                                    <input type="text" id="extension_custom" class="form-control" placeholder="Enter custom extension" onchange="customExtensionChanged()">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Back to dropdown">
+                                            <i class="fa fa-list"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
                             <small class="text-muted">Select from FreePBX extensions or enter a custom value</small>
                         </div>
                         <div class="form-group">
                             <label>SIP Secret</label>
-                            <div class="input-group">
-                                <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
-                                        <i class="fa fa-copy"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Toggle custom secret input">
-                                        <i class="fa fa-edit"></i>
-                                    </button>
-                                </span>
+                            <div id="secret_preview_wrapper">
+                                <div class="input-group">
+                                    <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
+                                            <i class="fa fa-copy"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Toggle custom secret input">
+                                            <i class="fa fa-edit"></i>
+                                        </button>
+                                    </span>
+                                </div>
                             </div>
-                            <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret" style="display:none; margin-top:5px;">
+                            <div id="secret_custom_wrapper" style="display:none;">
+                                <div class="input-group">
+                                    <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret">
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
+                                            <i class="fa fa-refresh"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
                             <small class="text-muted">Auto-fetched from FreePBX or enter a custom value</small>
                         </div>
                         <hr>
@@ -351,7 +373,7 @@ function editDevice(id) {
 
             // Handle extension - check if it's a FreePBX extension or custom
             var extensionFound = false;
-            $('#extension option').each(function() {
+            $('#extension_select option').each(function() {
                 if ($(this).val() === d.extension) {
                     extensionFound = true;
                     return false;
@@ -359,12 +381,16 @@ function editDevice(id) {
             });
 
             if (extensionFound) {
-                $('#extension').val(d.extension).show();
-                $('#extension_custom').val('').hide();
+                $('#extension_select').val(d.extension);
+                $('#extension').val(d.extension);
+                $('#extension_select_wrapper').show();
+                $('#extension_custom_wrapper').hide();
             } else {
                 // Custom extension
-                $('#extension').hide();
-                $('#extension_custom').val(d.extension).show();
+                $('#extension_custom').val(d.extension);
+                $('#extension').val(d.extension);
+                $('#extension_select_wrapper').hide();
+                $('#extension_custom_wrapper').show();
             }
 
             loadSipSecret(); // Load secret after extension set
@@ -402,10 +428,15 @@ function deleteDevice(id) {
 function newDevice() {
     $('#deviceForm')[0].reset();
     $('#deviceId').val('');
-    $('#extension').val('').show();
-    $('#extension_custom').val('').hide();
-    $('#sip_secret_preview').val('').show();
-    $('#sip_secret_custom').val('').hide();
+    $('#extension_select').val('');
+    $('#extension').val('');
+    $('#extension_custom').val('');
+    $('#extension_select_wrapper').show();
+    $('#extension_custom_wrapper').hide();
+    $('#sip_secret_preview').val('');
+    $('#sip_secret_custom').val('');
+    $('#secret_preview_wrapper').show();
+    $('#secret_custom_wrapper').hide();
     $('#prov_username').val('');
     $('#prov_password').val('');
     currentKeys = [];
@@ -655,9 +686,15 @@ function showExampleJSON() {
     $('#driverInput').val(example);
 }
 
+function extensionSelectChanged() {
+    var ext = $('#extension_select').val();
+    $('#extension').val(ext);
+    loadSipSecret();
+}
+
 function loadSipSecret() {
     var ext = $('#extension').val();
-    if (!ext || ext === '__custom__') {
+    if (!ext) {
         $('#sip_secret_preview').val('');
         return;
     }
@@ -675,38 +712,45 @@ function loadSipSecret() {
 }
 
 function toggleCustomExtension() {
-    var customInput = $('#extension_custom');
-    var select = $('#extension');
-    if (customInput.is(':visible')) {
+    var selectWrapper = $('#extension_select_wrapper');
+    var customWrapper = $('#extension_custom_wrapper');
+    if (customWrapper.is(':visible')) {
         // Switch back to dropdown
-        customInput.hide();
-        select.show();
-        select.val('').trigger('change');
+        customWrapper.hide();
+        selectWrapper.show();
+        var ext = $('#extension_select').val();
+        $('#extension').val(ext);
+        loadSipSecret();
     } else {
         // Switch to custom input
-        select.hide();
-        customInput.show().focus();
+        selectWrapper.hide();
+        customWrapper.show();
+        $('#extension_custom').focus();
+        $('#extension').val($('#extension_custom').val());
         $('#sip_secret_preview').val('');
     }
 }
 
 function customExtensionChanged() {
+    var ext = $('#extension_custom').val();
+    $('#extension').val(ext);
     // Clear secret when custom extension is changed
     $('#sip_secret_preview').val('');
 }
 
 function toggleCustomSecret() {
-    var customInput = $('#sip_secret_custom');
-    var preview = $('#sip_secret_preview');
-    if (customInput.is(':visible')) {
+    var previewWrapper = $('#secret_preview_wrapper');
+    var customWrapper = $('#secret_custom_wrapper');
+    if (customWrapper.is(':visible')) {
         // Switch back to auto-fetch
-        customInput.hide();
-        preview.show();
+        customWrapper.hide();
+        previewWrapper.show();
         loadSipSecret();
     } else {
         // Switch to custom input
-        preview.hide();
-        customInput.show().focus();
+        previewWrapper.hide();
+        customWrapper.show();
+        $('#sip_secret_custom').focus();
     }
 }
 
@@ -865,33 +909,14 @@ function uploadAsset() {
 $('#deviceForm').submit(function(e) {
     e.preventDefault();
 
-    // Handle extension: use custom if visible, otherwise use dropdown
-    var extension;
-    if ($('#extension_custom').is(':visible')) {
-        extension = $('#extension_custom').val();
-        if (!extension) {
-            alert('Please enter an extension value');
-            return;
-        }
-    } else {
-        extension = $('#extension').val();
-        if (extension === '__custom__') {
-            alert('Please toggle to custom extension mode and enter a value');
-            return;
-        }
-        if (!extension) {
-            alert('Please select an extension');
-            return;
-        }
+    // Validate extension field
+    var extension = $('#extension').val();
+    if (!extension) {
+        alert('Please select or enter an extension');
+        return;
     }
 
-    // Update the hidden field or the select before serializing
-    if ($('#extension_custom').is(':visible')) {
-        // Temporarily set the select to custom value for serialization
-        var tempOption = $('<option>').val(extension).text(extension);
-        $('#extension').append(tempOption).val(extension);
-    }
-
+    // Prepare form data
     var data = {
         action: 'save_device',
         data: $(this).serialize(),
