@@ -49,7 +49,7 @@ $csrf_token = $_SESSION['qp_csrf'];
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
-        <li><a data-toggle="tab" href="#tab-edit">Add/Edit Device</a></li>
+        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Device</a></li>
         <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
         <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
         <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
@@ -535,19 +535,40 @@ function loadDeviceOptions() {
     if (profile && profile.configurable_options) {
         profile.configurable_options.forEach(function(opt) {
             html += '<div class="form-group">';
-            html += '<label title="' + (opt.description || '') + '">' + opt.label + '</label>';
+            // Label with required indicator
+            html += '<label title="' + (opt.description || '') + '">';
+            html += opt.label;
+            if (opt.required) {
+                html += ' <span class="text-danger">*</span>';
+            }
+            html += '</label>';
+            
+            // Field based on type
             if (opt.type === 'bool') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"><option value="">Default (' + opt.default + ')</option><option value="1">On</option><option value="0">Off</option></select>';
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
+                html += '<option value="1">On</option>';
+                html += '<option value="0">Off</option>';
+                html += '</select>';
             } else if (opt.type === 'select') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"><option value="">Default (' + opt.default + ')</option>';
+                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                html += '<option value="">Default (' + opt.default + ')</option>';
                 for (var val in opt.options) {
                     html += '<option value="' + val + '">' + opt.options[val] + '</option>';
                 }
                 html += '</select>';
             } else if (opt.type === 'number') {
-                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" placeholder="Default: ' + opt.default + '">';
+                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
             } else {
-                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" placeholder="Default: ' + opt.default + '">';
+                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" ';
+                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+            }
+            
+            // Description help text
+            if (opt.description) {
+                html += '<small class="help-block text-muted">' + opt.description + '</small>';
             }
             html += '</div>';
         });
@@ -583,10 +604,36 @@ function renderPreview() {
         container.css('backgroundImage', 'url(' + ve.background_image_url + ')');
     } else if (ve.svg_fallback) {
         var sch = ve.schematic;
+        // Enhanced SVG scaffold with better visual representation
         var svg = `<svg width="${sch.chassis_width}" height="${sch.chassis_height}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100%" height="100%" fill="#333" rx="30"/>
-            <rect x="${sch.screen_x}" y="${sch.screen_y}" width="${sch.screen_width}" height="${sch.screen_height}" fill="#000"/>
-            <text x="50%" y="50%" fill="#666" font-size="24" text-anchor="middle" dominant-baseline="middle">SVG Fallback</text>
+            <!-- Phone chassis with gradient -->
+            <defs>
+                <linearGradient id="chassis-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#4a4a4a;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#2a2a2a;stop-opacity:1" />
+                </linearGradient>
+                <linearGradient id="screen-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#0a0a0a;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            <!-- Chassis background -->
+            <rect width="100%" height="100%" fill="url(#chassis-gradient)" rx="30" ry="30"/>
+            <!-- Screen area with border -->
+            <rect x="${sch.screen_x}" y="${sch.screen_y}" width="${sch.screen_width}" height="${sch.screen_height}" 
+                  fill="url(#screen-gradient)" stroke="#555" stroke-width="2" rx="5" ry="5"/>
+            <!-- Screen frame highlight -->
+            <rect x="${sch.screen_x + 2}" y="${sch.screen_y + 2}" width="${sch.screen_width - 4}" height="${sch.screen_height - 4}" 
+                  fill="none" stroke="#666" stroke-width="1" rx="4" ry="4"/>
+            <!-- Model label -->
+            <text x="50%" y="30" fill="#999" font-size="18" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">
+                ${profile.display_name || model}
+            </text>
+            <!-- SVG Fallback indicator -->
+            <text x="50%" y="${sch.screen_y + sch.screen_height/2}" fill="#444" font-size="16" text-anchor="middle" 
+                  dominant-baseline="middle" font-family="Arial, sans-serif">
+                SVG Preview Mode
+            </text>
         </svg>`;
         container.css('backgroundImage', 'url(data:image/svg+xml;base64,' + btoa(svg) + ')');
     }
