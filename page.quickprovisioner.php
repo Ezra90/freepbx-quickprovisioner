@@ -48,7 +48,7 @@ $csrf_token = $_SESSION['qp_csrf'];
             <button class="btn btn-success" onclick="newDevice()">Add New</button>
             <button class="btn btn-default" onclick="loadDevices()">Refresh</button>
             <table class="table table-striped" style="margin-top:15px;">
-                <thead><tr><th>MAC</th><th>Extension</th><th>Model</th><th>Actions</th></tr></thead>
+                <thead><tr><th>MAC</th><th>Extension</th><th>Secret</th><th>Model</th><th>Actions</th></tr></thead>
                 <tbody id="deviceListBody"></tbody>
             </table>
         </div>
@@ -98,7 +98,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                         <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
                                             <i class="fa fa-copy"></i>
                                         </button>
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Toggle custom secret input">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret for reference">
                                             <i class="fa fa-edit"></i>
                                         </button>
                                     </span>
@@ -106,7 +106,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                             </div>
                             <div id="secret_custom_wrapper" style="display:none;">
                                 <div class="input-group">
-                                    <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret">
+                                    <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret (for reference only)">
                                     <span class="input-group-btn">
                                         <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
                                             <i class="fa fa-refresh"></i>
@@ -114,7 +114,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                     </span>
                                 </div>
                             </div>
-                            <small class="text-muted">Auto-fetched from FreePBX or enter a custom value</small>
+                            <small class="text-muted">Auto-fetched from FreePBX or enter manually for reference (not stored)</small>
                         </div>
                         <hr>
                         <div class="form-group"><label>Model</label>
@@ -356,11 +356,41 @@ var currentDeviceId = null;
 var profiles = {};
 
 function loadDevices() {
-    $('#deviceListBody').html('');
-    <?php foreach ($devices as $d): ?>
-        var row = '<tr><td>' + <?= json_encode($d["mac"]) ?> + '</td><td>' + <?= json_encode($d["extension"]) ?> + '</td><td>' + <?= json_encode($d["model"]) ?> + '</td><td><button onclick="editDevice(<?= $d["id"] ?>)">Edit</button> <button onclick="deleteDevice(<?= $d["id"] ?>)">Delete</button></td></tr>';
-        $('#deviceListBody').append(row);
-    <?php endforeach; ?>
+    $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            $('#deviceListBody').html('');
+            r.devices.forEach(function(d) {
+                var secretDisplay = '';
+                if (d.secret) {
+                    // Mask the secret but show first 4 chars
+                    var masked = d.secret.substring(0, 4) + '********';
+                    secretDisplay = '<span title="Click to reveal">' + masked + '</span> ';
+                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="revealSecret(\'' + d.secret + '\')"><i class="fa fa-eye"></i></button> ';
+                    secretDisplay += '<button class="btn btn-xs btn-default" onclick="copySecretToClipboard(\'' + d.secret + '\')"><i class="fa fa-copy"></i></button>';
+                } else {
+                    secretDisplay = '<span class="text-muted">N/A</span>';
+                }
+                var row = '<tr><td>' + d.mac + '</td><td>' + d.extension + '</td><td>' + secretDisplay + '</td><td>' + d.model + '</td><td><button class="btn btn-sm btn-default" onclick="editDevice(' + d.id + ')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteDevice(' + d.id + ')">Delete</button></td></tr>';
+                $('#deviceListBody').append(row);
+            });
+        } else {
+            $('#deviceListBody').html('<tr><td colspan="5">Error loading devices: ' + r.message + '</td></tr>');
+        }
+    }, 'json').fail(function() {
+        $('#deviceListBody').html('<tr><td colspan="5">Failed to load devices</td></tr>');
+    });
+}
+
+function revealSecret(secret) {
+    alert('SIP Secret: ' + secret);
+}
+
+function copySecretToClipboard(secret) {
+    navigator.clipboard.writeText(secret).then(function() {
+        alert('Secret copied to clipboard!');
+    }).catch(function() {
+        alert('Copy failed.');
+    });
 }
 
 function editDevice(id) {
@@ -747,7 +777,7 @@ function toggleCustomSecret() {
         previewWrapper.show();
         loadSipSecret();
     } else {
-        // Switch to custom input
+        // Switch to custom input (for reference only, not stored)
         previewWrapper.hide();
         customWrapper.show();
         $('#sip_secret_custom').focus();
@@ -756,11 +786,22 @@ function toggleCustomSecret() {
 
 function copyToClipboard(id) {
     var text = document.getElementById(id).value;
-    navigator.clipboard.writeText(text).then(function() {
-        alert('Copied to clipboard!');
-    }).catch(function() {
-        alert('Copy failed.');
-    });
+    if (!text) {
+        // If preview is empty, try to get value from custom input
+        var customText = $('#sip_secret_custom').val();
+        if (customText) {
+            text = customText;
+        }
+    }
+    if (text) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Copied to clipboard!');
+        }).catch(function() {
+            alert('Copy failed.');
+        });
+    } else {
+        alert('No secret to copy.');
+    }
 }
 
 function generateProvPassword() {
