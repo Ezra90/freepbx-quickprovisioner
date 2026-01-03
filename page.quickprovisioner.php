@@ -49,7 +49,7 @@ $csrf_token = $_SESSION['qp_csrf'];
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
-        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Device</a></li>
+        <li><a data-toggle="tab" href="#tab-edit">Edit/Generate Provisioning</a></li>
         <li><a data-toggle="tab" href="#tab-contacts">Contacts</a></li>
         <li><a data-toggle="tab" href="#tab-assets" onclick="loadAssets()">Asset Manager</a></li>
         <li><a data-toggle="tab" href="#tab-templates" onclick="loadTemplates()">Handset Model Templates</a></li>
@@ -72,137 +72,382 @@ $csrf_token = $_SESSION['qp_csrf'];
                 <input type="hidden" id="deviceId">
                 <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
                 <input type="hidden" id="extension" name="extension">
+                <input type="hidden" id="wallpaper">
+                <input type="hidden" id="wallpaper_mode" value="crop">
+                
                 <div class="row">
+                    <!-- LEFT COLUMN: Core Device Settings (Always Visible) -->
                     <div class="col-md-4">
-                        <div class="form-group">
-                            <label>Extension Number</label>
-                            <div id="extension_select_wrapper">
-                                <div class="input-group">
-                                    <select id="extension_select" class="form-control" required onchange="extensionSelectChanged()">
-                                        <option value="">-- Select Extension --</option>
-                                        <?php foreach ($extensions as $ext): ?>
-                                            <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
-                                        <?php endforeach; ?>
+                        <div class="panel panel-primary">
+                            <div class="panel-heading"><strong>Core Device Settings</strong></div>
+                            <div class="panel-body">
+                                
+                                <!-- Extension Number -->
+                                <div class="form-group">
+                                    <label>Extension Number</label>
+                                    <div id="extension_select_wrapper">
+                                        <div class="input-group">
+                                            <select id="extension_select" class="form-control" required onchange="extensionSelectChanged()">
+                                                <option value="">-- Select Extension --</option>
+                                                <?php foreach ($extensions as $ext): ?>
+                                                    <option value="<?= htmlspecialchars($ext) ?>"><?= htmlspecialchars($ext) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <span class="input-group-btn">
+                                                <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Toggle custom extension input">
+                                                    <i class="fa fa-edit"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div id="extension_custom_wrapper" style="display:none;">
+                                        <div class="input-group">
+                                            <input type="text" id="extension_custom" class="form-control" placeholder="Enter custom extension" onchange="customExtensionChanged()">
+                                            <span class="input-group-btn">
+                                                <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Back to dropdown">
+                                                    <i class="fa fa-list"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Select from FreePBX extensions or enter a custom value</small>
+                                </div>
+
+                                <!-- SIP Secret -->
+                                <div class="form-group">
+                                    <label>SIP Secret</label>
+                                    <input type="hidden" id="custom_sip_secret" name="custom_sip_secret">
+                                    <div id="secret_preview_wrapper">
+                                        <div class="input-group">
+                                            <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
+                                            <span class="input-group-btn">
+                                                <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
+                                                    <i class="fa fa-copy"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret to save">
+                                                    <i class="fa fa-edit"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div id="secret_custom_wrapper" style="display:none;">
+                                        <div class="input-group">
+                                            <input type="text" id="sip_secret_custom_input" class="form-control" placeholder="Enter custom SIP secret">
+                                            <span class="input-group-btn">
+                                                <button type="button" class="btn btn-success" onclick="saveCustomSecret()" title="Save custom secret">
+                                                    <i class="fa fa-save"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
+                                                    <i class="fa fa-refresh"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Auto-fetched from FreePBX or enter custom secret (will be saved and used in provisioning)</small>
+                                </div>
+
+                                <hr>
+
+                                <!-- Model -->
+                                <div class="form-group">
+                                    <label>Model</label>
+                                    <select id="model" class="form-control" onchange="loadProfile(); updateRightColumnHeader(); updateHandsetSettingsPreview();">
+                                        <!-- Populated by loadTemplates() -->
                                     </select>
-                                    <span class="input-group-btn">
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Toggle custom extension input">
-                                            <i class="fa fa-edit"></i>
-                                        </button>
-                                    </span>
                                 </div>
-                            </div>
-                            <div id="extension_custom_wrapper" style="display:none;">
-                                <div class="input-group">
-                                    <input type="text" id="extension_custom" class="form-control" placeholder="Enter custom extension" onchange="customExtensionChanged()">
-                                    <span class="input-group-btn">
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomExtension()" title="Back to dropdown">
-                                            <i class="fa fa-list"></i>
-                                        </button>
-                                    </span>
+                                <div id="modelNotes" style="margin-bottom:15px; color:#666;"></div>
+
+                                <hr>
+
+                                <!-- MAC Address -->
+                                <div class="form-group">
+                                    <label>MAC Address</label>
+                                    <input type="text" id="mac" class="form-control" required>
                                 </div>
-                            </div>
-                            <small class="text-muted">Select from FreePBX extensions or enter a custom value</small>
-                        </div>
-                        <div class="form-group">
-                            <label>SIP Secret</label>
-                            <input type="hidden" id="custom_sip_secret" name="custom_sip_secret">
-                            <div id="secret_preview_wrapper">
-                                <div class="input-group">
-                                    <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
-                                    <span class="input-group-btn">
-                                        <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
-                                            <i class="fa fa-copy"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret to save">
-                                            <i class="fa fa-edit"></i>
-                                        </button>
-                                    </span>
+
+                                <hr>
+
+                                <!-- Remote Provisioning Authentication -->
+                                <h4>Remote Provisioning Authentication</h4>
+                                <div class="form-group">
+                                    <label>Provisioning Username</label>
+                                    <input type="text" id="prov_username" class="form-control" placeholder="Required for remote provisioning">
+                                    <small class="text-muted">Remote provisioning requires per-device credentials. Devices must send HTTP Basic Auth when retrieving configs or media.</small>
                                 </div>
-                            </div>
-                            <div id="secret_custom_wrapper" style="display:none;">
-                                <div class="input-group">
-                                    <input type="text" id="sip_secret_custom_input" class="form-control" placeholder="Enter custom SIP secret">
-                                    <span class="input-group-btn">
-                                        <button type="button" class="btn btn-success" onclick="saveCustomSecret()" title="Save custom secret">
-                                            <i class="fa fa-save"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
-                                            <i class="fa fa-refresh"></i>
-                                        </button>
-                                    </span>
+                                <div class="form-group">
+                                    <label>Provisioning Password</label>
+                                    <div class="input-group">
+                                        <input type="text" id="prov_password" class="form-control" placeholder="Required for remote provisioning">
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-default" onclick="generateProvPassword()">Generate</button>
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                            <small class="text-muted">Auto-fetched from FreePBX or enter custom secret (will be saved and used in provisioning)</small>
-                        </div>
-                        <hr>
-                        <div class="form-group"><label>Model</label>
-                            <select id="model" class="form-control" onchange="loadProfile(); updatePageSelect(); renderPreview(); showModelNotes(); loadDeviceOptions();">
-                                <!-- Populated by loadTemplates() -->
-                            </select>
-                        </div>
-                        <div id="modelNotes" style="margin-bottom:15px; color:#666;"></div>
-                        <hr>
-                        <div class="form-group"><label>MAC Address</label><input type="text" id="mac" class="form-control" required></div>
-                        <hr>
-                        <h4>Remote Provisioning Authentication</h4>
-                        <div class="form-group">
-                            <label>Provisioning Username</label>
-                            <input type="text" id="prov_username" class="form-control" placeholder="Required for remote provisioning">
-                            <small class="text-muted">Remote provisioning requires per-device credentials. Devices must send HTTP Basic Auth when retrieving configs or media.</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Provisioning Password</label>
-                            <div class="input-group">
-                                <input type="text" id="prov_password" class="form-control" placeholder="Required for remote provisioning">
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default" onclick="generateProvPassword()">Generate</button>
-                                </span>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="form-group"><label>Wallpaper</label>
-                            <div class="input-group">
-                                <input type="text" id="wallpaper" class="form-control" readonly placeholder="Click Pick to select" onchange="renderPreview()">
-                                <span class="input-group-btn">
-                                    <button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button>
-                                    <button type="button" class="btn btn-default" onclick="clearWallpaper()" title="Clear wallpaper">
-                                        <i class="fa fa-times"></i>
-                                    </button>
-                                </span>
-                            </div>
-                            <div id="wallpaperPreview" style="margin-top:10px; display:none;">
-                                <img id="wallpaperPreviewImg" style="max-width:200px; max-height:150px; border:1px solid #ccc; border-radius:4px;">
+
+                                <hr>
+
+                                <!-- Advanced: Custom Template Override -->
+                                <div class="panel-group">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading" style="cursor:pointer;" onclick="$('#advancedTemplateOverride').collapse('toggle');">
+                                            <h4 class="panel-title">
+                                                <i class="fa fa-caret-right"></i> Advanced: Custom Template Override
+                                            </h4>
+                                        </div>
+                                        <div id="advancedTemplateOverride" class="panel-collapse collapse">
+                                            <div class="panel-body">
+                                                <textarea id="custom_template_override" class="form-control" rows="8" placeholder="Paste custom template here to override default..."></textarea>
+                                                <p class="text-warning"><small>Warning: This overrides the model template entirely. Use with caution.</small></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                <!-- Action Buttons -->
+                                <button type="submit" class="btn btn-success btn-block btn-lg">
+                                    <i class="fa fa-save"></i> Save Device
+                                </button>
+                                <button type="button" class="btn btn-info btn-block" onclick="previewConfig()">
+                                    <i class="fa fa-eye"></i> Preview Provisioning Config
+                                </button>
                             </div>
                         </div>
-                        <div class="form-group"><label>Wallpaper Mode</label>
-                            <select id="wallpaper_mode" class="form-control" onchange="renderPreview()">
-                                <option value="crop">Crop to Fill (recommended)</option>
-                                <option value="fit">Fit (Letterbox - may show black bars)</option>
-                            </select>
-                            <small class="help-block text-muted">Crop mode fills the entire screen by cropping edges. Fit mode shows the entire image with possible black bars.</small>
-                        </div>
-                        <div class="form-group"><label>Page</label>
-                            <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
-                        </div>
-                        <hr>
-                        <div id="deviceOptions">
-                            <h4>Device Options</h4>
-                        </div>
-                        <hr>
-                        <div id="advancedOptions">
-                            <h4>Advanced: Custom Template Override</h4>
-                            <textarea id="custom_template_override" class="form-control" rows="10" placeholder="Paste custom template here to override default..."></textarea>
-                            <p class="text-warning">Warning: This overrides the model template entirely. Use with caution.</p>
-                        </div>
-                        <button type="submit" class="btn btn-success btn-block">Save Device</button>
-                        <button type="button" class="btn btn-info btn-block" onclick="previewConfig()">Preview Provisioning Config</button>
                     </div>
+
+                    <!-- RIGHT COLUMN: Template-Generated Content -->
                     <div class="col-md-8">
                         <div class="panel panel-default">
-                            <div class="panel-heading">Live Visual Preview</div>
+                            <div class="panel-heading">
+                                <strong id="rightColumnHeader">Select a Model to Load Template</strong>
+                            </div>
                             <div class="panel-body">
-                                <div id="previewContainer" style="position:relative; margin:0 auto; border:1px solid #ccc;">
-                                    <div id="keysLayer"></div>
+                                <!-- Sub-tabs for right column -->
+                                <ul class="nav nav-tabs" role="tablist" id="rightColumnTabs">
+                                    <li class="active"><a data-toggle="tab" href="#subtab-handset">Handset Settings</a></li>
+                                    <li><a data-toggle="tab" href="#subtab-assets">Phone Assets</a></li>
+                                    <li><a data-toggle="tab" href="#subtab-layout">Button Layout</a></li>
+                                </ul>
+
+                                <div class="tab-content" style="padding-top:20px;">
+                                    <!-- Sub-tab 1: Handset Settings -->
+                                    <div id="subtab-handset" class="tab-pane fade in active">
+                                        <div id="handsetSettingsContent">
+                                            <p class="text-muted">Select a model to view handset settings.</p>
+                                        </div>
+                                        
+                                        <!-- Live Config Preview -->
+                                        <div class="panel panel-default" style="margin-top:20px;">
+                                            <div class="panel-heading">
+                                                <strong>Live Config Preview</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <textarea id="liveConfigPreview" class="form-control" rows="10" readonly style="font-family:monospace; font-size:11px;"></textarea>
+                                            </div>
+                                        </div>
+
+                                        <!-- Smart Dial Shortcuts Section -->
+                                        <div class="panel panel-info" style="margin-top:20px;">
+                                            <div class="panel-heading">
+                                                <strong>Smart Dial Shortcuts</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <p class="text-muted">Configure single-digit speed dials that map to extensions or phone numbers.</p>
+                                                
+                                                <div class="row">
+                                                    <div class="col-sm-4">
+                                                        <label>Digit (0-9)</label>
+                                                        <select id="smartDialDigit" class="form-control">
+                                                            <option value="">-- Select --</option>
+                                                            <option value="0">0</option>
+                                                            <option value="1">1</option>
+                                                            <option value="2">2</option>
+                                                            <option value="3">3</option>
+                                                            <option value="4">4</option>
+                                                            <option value="5">5</option>
+                                                            <option value="6">6</option>
+                                                            <option value="7">7</option>
+                                                            <option value="8">8</option>
+                                                            <option value="9">9</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-sm-5">
+                                                        <label>Extension/Number</label>
+                                                        <input type="text" id="smartDialExtension" class="form-control" placeholder="Enter extension or number">
+                                                    </div>
+                                                    <div class="col-sm-3" style="padding-top:25px;">
+                                                        <button type="button" class="btn btn-primary" onclick="addSmartDialShortcut()">
+                                                            <i class="fa fa-plus"></i> Add
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div style="margin-top:15px;">
+                                                    <strong>Configured Shortcuts:</strong>
+                                                    <ul id="smartDialList" class="list-group" style="margin-top:10px;">
+                                                        <li class="list-group-item text-muted">No shortcuts configured yet</li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Auto Provisioning Settings -->
+                                        <div class="panel panel-default" style="margin-top:20px;">
+                                            <div class="panel-heading">
+                                                <strong>Auto Provisioning Settings</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <div class="form-group">
+                                                    <label>Auto Provisioning Server URL</label>
+                                                    <input type="text" name="custom_options[auto_provision.server.url]" id="autoProvisionUrl" class="form-control" placeholder="http://your-pbx-server/path">
+                                                    <small class="text-muted">URL where the phone will check for configuration updates. Pre-filled with FreePBX domain.</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Auto Provision Mode</label>
+                                                    <select name="custom_options[auto_provision.mode]" class="form-control">
+                                                        <option value="">-- Select Mode --</option>
+                                                        <option value="0">Disabled - Manual provisioning only</option>
+                                                        <option value="1">Power On - Check on boot only</option>
+                                                        <option value="2">Periodic - Check at regular intervals</option>
+                                                        <option value="6">Power On + Periodic - Check on boot and periodically</option>
+                                                    </select>
+                                                    <small class="text-muted">Controls when the phone checks for configuration updates.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- SIP Server Settings -->
+                                        <div class="panel panel-default">
+                                            <div class="panel-heading">
+                                                <strong>SIP Server Settings</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <div class="form-group">
+                                                    <label>SIP Server Host</label>
+                                                    <input type="text" name="custom_options[sip_server.host]" class="form-control" placeholder="FreePBX domain or IP">
+                                                    <small class="text-muted">Leave blank to use FreePBX server. Override for remote scenarios.</small>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>SIP Server Port</label>
+                                                    <input type="number" name="custom_options[sip_server.port]" class="form-control" placeholder="5060" min="1" max="65535">
+                                                    <small class="text-muted">Default: 5060. Change if using custom SIP port.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Device Options from Template -->
+                                        <div id="deviceOptions" style="margin-top:20px;">
+                                            <!-- Populated by loadDeviceOptions() -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Sub-tab 2: Phone Assets (Wallpaper) -->
+                                    <div id="subtab-assets" class="tab-pane fade">
+                                        <h4>Wallpaper Management</h4>
+                                        <p class="text-muted">Upload and manage wallpapers for your phone's screen.</p>
+                                        
+                                        <div class="panel panel-default">
+                                            <div class="panel-heading">
+                                                <strong>Target Screen Dimensions</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <p id="screenDimensions">
+                                                    <strong>Width:</strong> <span id="screenWidth">--</span>px &nbsp;&nbsp;
+                                                    <strong>Height:</strong> <span id="screenHeight">--</span>px
+                                                </p>
+                                                <small class="text-muted">Images will be automatically resized to these dimensions.</small>
+                                            </div>
+                                        </div>
+
+                                        <!-- Upload Section -->
+                                        <div class="panel panel-primary">
+                                            <div class="panel-heading">
+                                                <strong>Upload Wallpaper</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <input type="file" id="wallpaperUpload" class="form-control" accept="image/*">
+                                                <br>
+                                                <button type="button" class="btn btn-primary" onclick="uploadWallpaper()">
+                                                    <i class="fa fa-upload"></i> Upload
+                                                </button>
+                                                <p class="text-muted" style="margin-top:10px;"><small>Supports JPG, PNG, GIF. Max 5MB.</small></p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Custom URL Option -->
+                                        <div class="panel panel-default">
+                                            <div class="panel-heading">
+                                                <strong>Or Enter Custom URL</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <input type="text" id="customWallpaperUrl" class="form-control" placeholder="https://example.com/wallpaper.jpg">
+                                                <br>
+                                                <button type="button" class="btn btn-default" onclick="setCustomWallpaperUrl()">
+                                                    <i class="fa fa-link"></i> Use Custom URL
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Wallpaper Mode -->
+                                        <div class="form-group">
+                                            <label>Display Mode</label>
+                                            <select id="wallpaper_mode_select" class="form-control" onchange="updateWallpaperMode()">
+                                                <option value="crop">Crop to Fill (recommended)</option>
+                                                <option value="fit">Fit (Letterbox - may show black bars)</option>
+                                            </select>
+                                            <small class="help-block text-muted">Crop mode fills the entire screen by cropping edges. Fit mode shows the entire image with possible black bars.</small>
+                                        </div>
+
+                                        <!-- Preview -->
+                                        <div class="panel panel-info">
+                                            <div class="panel-heading">
+                                                <strong>Current Wallpaper Preview</strong>
+                                            </div>
+                                            <div class="panel-body text-center">
+                                                <div id="wallpaperPreview" style="display:none;">
+                                                    <img id="wallpaperPreviewImg" style="max-width:100%; max-height:400px; border:1px solid #ccc; border-radius:4px;">
+                                                    <br><br>
+                                                    <button type="button" class="btn btn-danger btn-sm" onclick="clearWallpaper()">
+                                                        <i class="fa fa-times"></i> Clear Wallpaper
+                                                    </button>
+                                                </div>
+                                                <div id="wallpaperPreviewEmpty">
+                                                    <p class="text-muted">No wallpaper selected</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Asset Gallery -->
+                                        <h4 style="margin-top:30px;">Asset Gallery</h4>
+                                        <div id="assetGallery" class="row">
+                                            <!-- Populated by loadAssetGallery() -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Sub-tab 3: Button Layout -->
+                                    <div id="subtab-layout" class="tab-pane fade">
+                                        <h4>Button Layout Editor</h4>
+                                        <p class="text-muted">Click buttons to configure their function and label.</p>
+                                        
+                                        <!-- Page Selector -->
+                                        <div class="form-group">
+                                            <label>Page</label>
+                                            <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
+                                        </div>
+
+                                        <!-- Visual Preview -->
+                                        <div class="panel panel-default">
+                                            <div class="panel-heading">
+                                                <strong>Live Visual Preview</strong>
+                                            </div>
+                                            <div class="panel-body">
+                                                <div id="previewContainer" style="position:relative; margin:0 auto; border:1px solid #ccc;">
+                                                    <div id="keysLayer"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -381,6 +626,7 @@ var currentKeys = [];
 var currentContacts = [];
 var currentDeviceId = null;
 var profiles = {};
+var smartDialShortcuts = {}; // Stores digit => extension mappings
 
 function loadDevices() {
     $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
@@ -453,13 +699,29 @@ function editDevice(id) {
             $('#wallpaper').val(d.wallpaper);
             updateWallpaperPreview(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
+            $('#wallpaper_mode_select').val(d.wallpaper_mode);
             $('#prov_username').val(d.prov_username || '');
             $('#prov_password').val(d.prov_password || '');
             currentKeys = JSON.parse(d.keys_json) || [];
             currentContacts = JSON.parse(d.contacts_json) || [];
             var custom_options = JSON.parse(d.custom_options_json) || {};
+            
+            // Load smart dial shortcuts if present
+            smartDialShortcuts = {};
+            if (custom_options.smart_dial_shortcuts) {
+                try {
+                    smartDialShortcuts = JSON.parse(custom_options.smart_dial_shortcuts);
+                } catch (e) {
+                    console.error('Error parsing smart dial shortcuts:', e);
+                }
+            }
+            updateSmartDialList();
+            
+            // Load other custom options
             for (var key in custom_options) {
-                $('[name="custom_options[' + key + ']"]').val(custom_options[key]);
+                if (key !== 'smart_dial_shortcuts') {
+                    $('[name="custom_options[' + key + ']"]').val(custom_options[key]);
+                }
             }
             $('#custom_template_override').val(d.custom_template_override);
             renderPreview();
@@ -499,7 +761,11 @@ function newDevice() {
     currentKeys = [];
     currentContacts = [];
     currentDeviceId = null;
+    smartDialShortcuts = {};
+    updateSmartDialList();
+    clearWallpaper();
     renderPreview();
+    $('a[href="#tab-edit"]').tab('show');
 }
 
 function loadTemplates() {
@@ -518,18 +784,39 @@ function loadTemplates() {
 
 function loadProfile() {
     var model = $('#model').val();
-    if (!model) return;
+    if (!model) {
+        console.log('No model selected');
+        return;
+    }
+    console.log('Loading template for model:', model);
+    
     $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        console.log('Template response:', r);
         if (r.status) {
-            profiles[model] = JSON.parse(r.json);
-            showModelNotes();
-            loadDeviceOptions();
-            updatePageSelect();
-            renderPreview();
+            try {
+                profiles[model] = JSON.parse(r.json);
+                console.log('Template parsed successfully:', profiles[model]);
+                showModelNotes();
+                loadDeviceOptions();
+                updatePageSelect();
+                updateRightColumnHeader();
+                updateScreenDimensions();
+                prefillAutoProvisionUrl();
+                renderPreview();
+                updateHandsetSettingsPreview();
+                loadAssetGallery();
+            } catch (e) {
+                console.error('JSON parse error:', e);
+                alert('Error parsing template JSON: ' + e.message);
+            }
         } else {
+            console.error('Template load failed:', r.message);
             alert('Error loading model: ' + r.message);
         }
-    }, 'json');
+    }, 'json').fail(function(xhr, status, error) {
+        console.error('AJAX failed:', status, error);
+        alert('Failed to load template. Check console for details.');
+    });
 }
 
 function showModelNotes() {
@@ -972,15 +1259,23 @@ function selectAsset(filename) {
 function clearWallpaper() {
     $('#wallpaper').val('');
     $('#wallpaperPreview').hide();
+    $('#wallpaperPreviewEmpty').show();
     renderPreview();
 }
 
 function updateWallpaperPreview(filename) {
     if (filename) {
-        $('#wallpaperPreviewImg').attr('src', 'assets/uploads/' + filename);
+        // Handle both uploaded files and custom URLs
+        var imgSrc = filename;
+        if (!filename.startsWith('http://') && !filename.startsWith('https://')) {
+            imgSrc = 'assets/uploads/' + filename;
+        }
+        $('#wallpaperPreviewImg').attr('src', imgSrc);
         $('#wallpaperPreview').show();
+        $('#wallpaperPreviewEmpty').hide();
     } else {
         $('#wallpaperPreview').hide();
+        $('#wallpaperPreviewEmpty').show();
     }
 }
 
@@ -1123,9 +1418,23 @@ $('#deviceForm').submit(function(e) {
     }
 
     // Prepare form data
+    // First, collect all form data
+    var formData = $(this).serializeArray();
+    
+    // Add smart dial shortcuts to custom_options if any exist
+    if (Object.keys(smartDialShortcuts).length > 0) {
+        formData.push({
+            name: 'custom_options[smart_dial_shortcuts]',
+            value: JSON.stringify(smartDialShortcuts)
+        });
+    }
+    
+    // Serialize back to string
+    var serializedData = $.param(formData);
+    
     var data = {
         action: 'save_device',
-        data: $(this).serialize(),
+        data: serializedData,
         keys_json: JSON.stringify(currentKeys),
         contacts_json: JSON.stringify(currentContacts)
     };
@@ -1140,6 +1449,244 @@ $('#deviceForm').submit(function(e) {
         }
     }, 'json');
 });
+
+// ========================================
+// NEW FUNCTIONS FOR RESTRUCTURED LAYOUT
+// ========================================
+
+// Update right column header with model name
+function updateRightColumnHeader() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.display_name) {
+        $('#rightColumnHeader').html('<i class="fa fa-check-circle text-success"></i> ' + profile.display_name + ' Template Loaded');
+    } else {
+        $('#rightColumnHeader').text('Select a Model to Load Template');
+    }
+}
+
+// Update screen dimensions display
+function updateScreenDimensions() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.visual_editor) {
+        $('#screenWidth').text(profile.visual_editor.screen_width || '--');
+        $('#screenHeight').text(profile.visual_editor.screen_height || '--');
+    } else {
+        $('#screenWidth').text('--');
+        $('#screenHeight').text('--');
+    }
+}
+
+// Update handset settings preview (live config)
+function updateHandsetSettingsPreview() {
+    var model = $('#model').val();
+    var profile = profiles[model];
+    
+    if (!profile || !profile.provisioning || !profile.provisioning.template) {
+        $('#liveConfigPreview').val('No template loaded yet');
+        return;
+    }
+    
+    // Get current values from left column
+    var ext = $('#extension').val() || '[Extension]';
+    var secret = $('#sip_secret_preview').val() || '[Password]';
+    var mac = $('#mac').val() || '[MAC]';
+    
+    // Simple variable replacement for preview
+    var template = profile.provisioning.template;
+    template = template.replace(/\{\{extension\}\}/g, ext);
+    template = template.replace(/\{\{password\}\}/g, secret);
+    template = template.replace(/\{\{mac\}\}/g, mac.toUpperCase());
+    template = template.replace(/\{\{display_name\}\}/g, ext);
+    
+    // Show first 500 characters
+    var preview = template.substring(0, 500);
+    if (template.length > 500) {
+        preview += '\n\n... (truncated, see Preview Config for full output)';
+    }
+    
+    $('#liveConfigPreview').val(preview);
+}
+
+// Pre-fill auto provisioning URL with current server
+function prefillAutoProvisionUrl() {
+    if (!$('#autoProvisionUrl').val()) {
+        var protocol = window.location.protocol;
+        var host = window.location.host;
+        var suggestedUrl = protocol + '//' + host + '/admin/modules/quickprovisioner/provision.php';
+        $('#autoProvisionUrl').attr('placeholder', suggestedUrl);
+    }
+}
+
+// Smart Dial Shortcuts Management
+function addSmartDialShortcut() {
+    var digit = $('#smartDialDigit').val();
+    var extension = $('#smartDialExtension').val().trim();
+    
+    if (!digit) {
+        alert('Please select a digit (0-9)');
+        return;
+    }
+    
+    if (!extension) {
+        alert('Please enter an extension or phone number');
+        return;
+    }
+    
+    // Add to smartDialShortcuts object
+    smartDialShortcuts[digit] = extension;
+    
+    // Clear inputs
+    $('#smartDialDigit').val('');
+    $('#smartDialExtension').val('');
+    
+    // Update display
+    updateSmartDialList();
+}
+
+function deleteSmartDialShortcut(digit) {
+    delete smartDialShortcuts[digit];
+    updateSmartDialList();
+}
+
+function updateSmartDialList() {
+    var html = '';
+    var count = 0;
+    
+    // Sort by digit
+    var digits = Object.keys(smartDialShortcuts).sort();
+    
+    digits.forEach(function(digit) {
+        var ext = smartDialShortcuts[digit];
+        html += '<li class="list-group-item">';
+        html += '<strong>Digit ' + digit + '</strong> dials <strong>' + $('<div>').text(ext).html() + '</strong>';
+        html += ' <button type="button" class="btn btn-xs btn-danger pull-right" onclick="deleteSmartDialShortcut(\'' + digit + '\')">';
+        html += '<i class="fa fa-trash"></i> Delete</button>';
+        html += '</li>';
+        count++;
+    });
+    
+    if (count === 0) {
+        html = '<li class="list-group-item text-muted">No shortcuts configured yet</li>';
+    }
+    
+    $('#smartDialList').html(html);
+}
+
+// Wallpaper Management Functions
+function uploadWallpaper() {
+    var file = $('#wallpaperUpload')[0].files[0];
+    if (!file) {
+        alert('Please select a file first');
+        return;
+    }
+    
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('action', 'upload_file');
+    fd.append('csrf_token', '<?= $csrf_token ?>');
+    
+    // Get target dimensions from loaded profile
+    var model = $('#model').val();
+    var profile = profiles[model];
+    if (profile && profile.visual_editor) {
+        var width = profile.visual_editor.screen_width || 0;
+        var height = profile.visual_editor.screen_height || 0;
+        if (width > 0 && height > 0) {
+            fd.append('resize_width', width);
+            fd.append('resize_height', height);
+        }
+    }
+    
+    $.ajax({
+        url: 'ajax.quickprovisioner.php',
+        type: 'POST',
+        data: fd,
+        contentType: false,
+        processData: false,
+        success: function(r) {
+            if (r.status) {
+                alert('Wallpaper uploaded successfully!');
+                loadAssetGallery();
+                // Automatically select the uploaded wallpaper
+                selectWallpaperFromGallery(r.url);
+            } else {
+                alert('Error: ' + r.message);
+            }
+        },
+        error: function() {
+            alert('Upload failed. Please try again.');
+        }
+    });
+}
+
+function setCustomWallpaperUrl() {
+    var url = $('#customWallpaperUrl').val().trim();
+    if (!url) {
+        alert('Please enter a URL');
+        return;
+    }
+    
+    $('#wallpaper').val(url);
+    updateWallpaperPreview(url);
+    renderPreview();
+    alert('Custom wallpaper URL set');
+}
+
+function updateWallpaperMode() {
+    var mode = $('#wallpaper_mode_select').val();
+    $('#wallpaper_mode').val(mode);
+    renderPreview();
+}
+
+function selectWallpaperFromGallery(filename) {
+    $('#wallpaper').val(filename);
+    updateWallpaperPreview(filename);
+    renderPreview();
+}
+
+function loadAssetGallery() {
+    $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            var html = '';
+            r.files.forEach(function(file) {
+                html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
+                html += '<div class="thumbnail">';
+                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
+                html += '<div class="caption">';
+                html += '<p style="font-size:11px; word-break:break-all;">' + file.filename + '</p>';
+                html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
+                html += '<button type="button" class="btn btn-xs btn-primary" onclick="selectWallpaperFromGallery(\'' + file.filename + '\')">Select</button> ';
+                html += '<button type="button" class="btn btn-xs btn-danger" onclick="deleteAssetFromGallery(\'' + file.filename + '\')">Delete</button>';
+                html += '</div></div></div>';
+            });
+            if (r.files.length === 0) {
+                html = '<div class="col-xs-12"><p class="text-muted">No assets uploaded yet. Upload your first wallpaper above.</p></div>';
+            }
+            $('#assetGallery').html(html);
+        }
+    }, 'json');
+}
+
+function deleteAssetFromGallery(filename) {
+    if (!confirm('Delete ' + filename + '?')) return;
+    $.post('ajax.quickprovisioner.php', {action: 'delete_asset', filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        if (r.status) {
+            loadAssetGallery();
+            // If this was the selected wallpaper, clear it
+            if ($('#wallpaper').val() === filename) {
+                clearWallpaper();
+            }
+        } else {
+            alert('Error: ' + r.message);
+        }
+    }, 'json');
+}
+
+// ========================================
+// END NEW FUNCTIONS
+// ========================================
 
 loadDevices();
 loadTemplates();
