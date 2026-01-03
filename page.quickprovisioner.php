@@ -177,8 +177,42 @@ $csrf_token = $_SESSION['qp_csrf'];
                 <thead><tr><th>Model</th><th>Display Name</th><th>Actions</th></tr></thead>
                 <tbody id="templatesList"></tbody>
             </table>
-            
-            <!-- Update Panel -->
+        </div>
+        
+        <div id="tab-admin" class="tab-pane fade">
+            <!-- PBX Controls Panel -->
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">🎛️ PBX Controls</h3>
+                </div>
+                <div class="panel-body">
+                    <p class="text-info">
+                        <i class="fa fa-info-circle"></i> Use these controls to apply configuration changes or restart the PBX.
+                    </p>
+                    
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="reloadPBX()">
+                            <i class="fa fa-refresh"></i> Reload Config
+                        </button>
+                        <span class="text-muted">Apply configuration changes without interrupting calls</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button class="btn btn-warning" onclick="restartPBX()">
+                            <i class="fa fa-power-off"></i> Restart PBX
+                        </button>
+                        <span class="text-danger">
+                            <i class="fa fa-exclamation-triangle"></i> <strong>Warning:</strong> This will briefly interrupt active calls!
+                        </span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div id="pbxStatus" style="margin-top: 15px;"></div>
+                </div>
+            </div>
+
+            <!-- Module Updates Panel -->
             <div class="panel panel-info" style="margin-top: 30px;">
                 <div class="panel-heading">
                     <h3 class="panel-title">🔄 Module Updates</h3>
@@ -217,40 +251,6 @@ $csrf_token = $_SESSION['qp_csrf'];
                     </div>
                     
                     <div id="updateResult" style="margin-top: 15px; display: none;"></div>
-                </div>
-            </div>
-        </div>
-        
-        <div id="tab-admin" class="tab-pane fade">
-            <!-- PBX Controls Panel -->
-            <div class="panel panel-primary">
-                <div class="panel-heading">
-                    <h3 class="panel-title">🎛️ PBX Controls</h3>
-                </div>
-                <div class="panel-body">
-                    <p class="text-info">
-                        <i class="fa fa-info-circle"></i> Use these controls to apply configuration changes or restart the PBX.
-                    </p>
-                    
-                    <div class="form-group">
-                        <button class="btn btn-success" onclick="reloadPBX()">
-                            <i class="fa fa-refresh"></i> Reload Config
-                        </button>
-                        <span class="text-muted">Apply configuration changes without interrupting calls</span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <button class="btn btn-warning" onclick="restartPBX()">
-                            <i class="fa fa-power-off"></i> Restart PBX
-                        </button>
-                        <span class="text-danger">
-                            <i class="fa fa-exclamation-triangle"></i> <strong>Warning:</strong> This will briefly interrupt active calls!
-                        </span>
-                    </div>
-                    
-                    <hr>
-                    
-                    <div id="pbxStatus" style="margin-top: 15px;"></div>
                 </div>
             </div>
         </div>
