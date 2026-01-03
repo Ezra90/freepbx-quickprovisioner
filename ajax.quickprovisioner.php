@@ -88,14 +88,19 @@ switch ($action) {
         $security_pin = $form['security_pin'] ?? '';
         $prov_username = $form['prov_username'] ?? '';
         $prov_password = $form['prov_password'] ?? '';
+        $custom_sip_secret = $form['custom_sip_secret'] ?? null;
+        // Allow empty string to clear the custom secret
+        if ($custom_sip_secret === '') {
+            $custom_sip_secret = null;
+        }
 
         $id = $form['deviceId'] ?? null;
         if ($id) {
-            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=? WHERE id=?";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $id];
+            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=?, custom_sip_secret=? WHERE id=?";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret, $id];
         } else {
-            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password];
+            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password, custom_sip_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret];
         }
         $db->query($sql, $params);
         \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Device saved: MAC=" . $form['mac']);
@@ -120,25 +125,34 @@ switch ($action) {
         foreach ($rows as $row) {
             $ext = $row['extension'];
             $secret = '';
-            try {
-                // Try to fetch secret from FreePBX - check for null/false
-                $device = \FreePBX::Core()->getDevice($ext);
-                if ($device && is_array($device) && isset($device['secret'])) {
-                    $secret = $device['secret'];
-                } else {
-                    // Log when device not found
-                    error_log("Quick Provisioner: Secret not found for extension $ext");
+            $secretSource = '';
+
+            // Check if custom secret is set
+            if (!empty($row['custom_sip_secret'])) {
+                $secret = $row['custom_sip_secret'];
+                $secretSource = 'Custom';
+            } else {
+                // Try to fetch secret from FreePBX
+                try {
+                    $device = \FreePBX::Core()->getDevice($ext);
+                    if ($device && is_array($device) && isset($device['secret'])) {
+                        $secret = $device['secret'];
+                        $secretSource = 'FreePBX';
+                    } else {
+                        error_log("Quick Provisioner: Secret not found for extension $ext");
+                    }
+                } catch (Exception $e) {
+                    error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
                 }
-            } catch (Exception $e) {
-                // Log error but continue with other devices
-                error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
             }
+
             $devices[] = [
                 'id' => $row['id'],
                 'mac' => $row['mac'],
                 'extension' => $row['extension'],
                 'model' => $row['model'],
-                'secret' => $secret // Return actual secret for display
+                'secret' => $secret,
+                'secret_source' => $secretSource
             ];
         }
         $response = ['status' => true, 'devices' => $devices];
@@ -170,27 +184,38 @@ switch ($action) {
             $response['message'] = 'Invalid template JSON for model ' . $model;
             break;
         }
-        $custom_options = json_decode($device['custom_options_json'], true) ?? [];
         $template = $device['custom_template_override'] ? $device['custom_template_override'] : $profile['provisioning']['template'] ?? '';
         $ext = $device['extension'];
 
         // Fetch user info and secret with error handling
         $display_name = $ext;
         $secret = '';
+
+        // Use custom secret if available
+        if (!empty($device['custom_sip_secret'])) {
+            $secret = $device['custom_sip_secret'];
+        } else {
+            // Otherwise fetch from FreePBX
+            try {
+                $deviceInfo = \FreePBX::Core()->getDevice($ext);
+                if ($deviceInfo && is_array($deviceInfo) && isset($deviceInfo['secret'])) {
+                    $secret = $deviceInfo['secret'];
+                } else {
+                    error_log("Quick Provisioner: Secret not found for extension $ext during config preview");
+                }
+            } catch (Exception $e) {
+                error_log("Quick Provisioner: Error fetching FreePBX data for extension $ext - " . $e->getMessage());
+            }
+        }
+
+        // Fetch display name
         try {
             $userInfo = \FreePBX::Core()->getUser($ext);
             if ($userInfo && is_array($userInfo) && isset($userInfo['name'])) {
                 $display_name = $userInfo['name'];
             }
-
-            $deviceInfo = \FreePBX::Core()->getDevice($ext);
-            if ($deviceInfo && is_array($deviceInfo) && isset($deviceInfo['secret'])) {
-                $secret = $deviceInfo['secret'];
-            } else {
-                error_log("Quick Provisioner: Secret not found for extension $ext during config preview");
-            }
         } catch (Exception $e) {
-            error_log("Quick Provisioner: Error fetching FreePBX data for extension $ext - " . $e->getMessage());
+            error_log("Quick Provisioner: Error fetching user info for extension $ext - " . $e->getMessage());
         }
 
         $server_ip = $_SERVER['SERVER_ADDR'];
