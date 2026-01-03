@@ -163,14 +163,23 @@ $csrf_token = $_SESSION['qp_csrf'];
                         <div class="form-group"><label>Wallpaper</label>
                             <div class="input-group">
                                 <input type="text" id="wallpaper" class="form-control" readonly placeholder="Click Pick to select" onchange="renderPreview()">
-                                <span class="input-group-btn"><button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button></span>
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default" onclick="$('a[href=\"#tab-assets\"]').tab('show'); loadAssets()">Pick</button>
+                                    <button type="button" class="btn btn-default" onclick="clearWallpaper()" title="Clear wallpaper">
+                                        <i class="fa fa-times"></i>
+                                    </button>
+                                </span>
+                            </div>
+                            <div id="wallpaperPreview" style="margin-top:10px; display:none;">
+                                <img id="wallpaperPreviewImg" style="max-width:200px; max-height:150px; border:1px solid #ccc; border-radius:4px;">
                             </div>
                         </div>
                         <div class="form-group"><label>Wallpaper Mode</label>
                             <select id="wallpaper_mode" class="form-control" onchange="renderPreview()">
-                                <option value="crop">Crop to Fill</option>
-                                <option value="fit">Fit (Letterbox)</option>
+                                <option value="crop">Crop to Fill (recommended)</option>
+                                <option value="fit">Fit (Letterbox - may show black bars)</option>
                             </select>
+                            <small class="help-block text-muted">Crop mode fills the entire screen by cropping edges. Fit mode shows the entire image with possible black bars.</small>
                         </div>
                         <div class="form-group"><label>Page</label>
                             <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
@@ -442,6 +451,7 @@ function editDevice(id) {
             loadSipSecret(); // Load secret after extension set
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
+            updateWallpaperPreview(d.wallpaper);
             $('#wallpaper_mode').val(d.wallpaper_mode);
             $('#prov_username').val(d.prov_username || '');
             $('#prov_password').val(d.prov_password || '');
@@ -954,8 +964,24 @@ function loadAssets() {
 
 function selectAsset(filename) {
     $('#wallpaper').val(filename);
+    updateWallpaperPreview(filename);
     renderPreview();
     $('a[href="#tab-edit"]').tab('show');
+}
+
+function clearWallpaper() {
+    $('#wallpaper').val('');
+    $('#wallpaperPreview').hide();
+    renderPreview();
+}
+
+function updateWallpaperPreview(filename) {
+    if (filename) {
+        $('#wallpaperPreviewImg').attr('src', 'assets/uploads/' + filename);
+        $('#wallpaperPreview').show();
+    } else {
+        $('#wallpaperPreview').hide();
+    }
 }
 
 function deleteAsset(filename) {
