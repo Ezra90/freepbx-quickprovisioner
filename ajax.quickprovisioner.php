@@ -150,9 +150,12 @@ switch ($action) {
         $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
         $wpUrl = "";
         if (!empty($device['wallpaper'])) {
-            $protocol = (isset($_SERVER['HTTPS']) ? "https" : "http");
-            $auth = $ext . ":" . $secret . "@";
+            $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
             $host = $_SERVER['HTTP_HOST'];
+            $auth = "";
+            if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
+                $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
+            }
             $wpUrl = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?mac=" . strtoupper(preg_replace('/[^A-F0-9]/', '', $device['mac']));
         }
         $vars = [
@@ -210,9 +213,12 @@ switch ($action) {
                 $item = str_replace('{{custom_label}}', htmlspecialchars($c['custom_label']), $item);
                 $photo_url = "";
                 if (!empty($c['photo'])) {
-                    $protocol = (isset($_SERVER['HTTPS']) ? "https" : "http");
-                    $auth = $ext . ":" . $secret . "@";
+                    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
                     $host = $_SERVER['HTTP_HOST'];
+                    $auth = "";
+                    if (!empty($device['prov_username']) && !empty($device['prov_password'])) {
+                        $auth = urlencode($device['prov_username']) . ":" . urlencode($device['prov_password']) . "@";
+                    }
                     $photo_url = "$protocol://$auth$host/admin/modules/quickprovisioner/media.php?file=" . $c['photo'] . "&mac=" . $vars['{{mac}}'] . "&w=100&h=100&mode=crop";
                 }
                 $item = str_replace('{{photo_url}}', $photo_url, $item);
