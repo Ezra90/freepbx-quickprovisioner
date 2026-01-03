@@ -126,7 +126,7 @@ switch ($action) {
             $ext = $row['extension'];
             $secret = '';
             $secretSource = '';
-            
+
             // Check if custom secret is set
             if (!empty($row['custom_sip_secret'])) {
                 $secret = $row['custom_sip_secret'];
@@ -145,7 +145,7 @@ switch ($action) {
                     error_log("Quick Provisioner: Error fetching secret for extension $ext - " . $e->getMessage());
                 }
             }
-            
+
             $devices[] = [
                 'id' => $row['id'],
                 'mac' => $row['mac'],
@@ -190,7 +190,7 @@ switch ($action) {
         // Fetch user info and secret with error handling
         $display_name = $ext;
         $secret = '';
-        
+
         // Use custom secret if available
         if (!empty($device['custom_sip_secret'])) {
             $secret = $device['custom_sip_secret'];
@@ -207,7 +207,7 @@ switch ($action) {
                 error_log("Quick Provisioner: Error fetching FreePBX data for extension $ext - " . $e->getMessage());
             }
         }
-        
+
         // Fetch display name
         try {
             $userInfo = \FreePBX::Core()->getUser($ext);

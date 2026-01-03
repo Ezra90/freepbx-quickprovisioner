@@ -745,14 +745,14 @@ function loadSipSecret() {
         $('#sip_secret_preview').val('');
         return;
     }
-    
+
     // First check if we have a custom secret saved for this device
     var customSecret = $('#custom_sip_secret').val();
     if (customSecret) {
         $('#sip_secret_preview').val(customSecret + ' (Custom)');
         return;
     }
-    
+
     // Otherwise fetch from FreePBX
     $.post('ajax.quickprovisioner.php', {
         action: 'get_sip_secret',
@@ -827,17 +827,17 @@ function saveCustomSecret() {
         alert('Please enter a secret');
         return;
     }
-    
+
     // Save to hidden field
     $('#custom_sip_secret').val(secret);
-    
+
     // Show in preview
     $('#sip_secret_preview').val(secret + ' (Custom)');
-    
+
     // Switch back to preview mode
     $('#secret_custom_wrapper').hide();
     $('#secret_preview_wrapper').show();
-    
+
     alert('Custom secret saved. Click "Save Device" to persist to database.');
 }
 

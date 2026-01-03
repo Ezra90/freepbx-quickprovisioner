@@ -31,10 +31,10 @@ if (!qp_is_local_network()) {
     if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] !== 'on') {
         \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "WARNING: Remote provisioning over HTTP (non-HTTPS) for MAC: $mac");
     }
-    
+
     $prov_user = $device['prov_username'] ?? '';
     $prov_pass = $device['prov_password'] ?? '';
-    
+
     // Always require credentials for remote access
     if (empty($prov_user) || empty($prov_pass)) {
         header('WWW-Authenticate: Basic realm="Phone Provisioning"');
@@ -42,10 +42,10 @@ if (!qp_is_local_network()) {
         \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Remote provisioning denied - no credentials configured for MAC: $mac");
         die('Authentication required');
     }
-    
+
     $auth_user = $_SERVER['PHP_AUTH_USER'] ?? '';
     $auth_pass = $_SERVER['PHP_AUTH_PW'] ?? '';
-    
+
     if ($auth_user !== $prov_user || $auth_pass !== $prov_pass) {
         header('WWW-Authenticate: Basic realm="Phone Provisioning"');
         header('HTTP/1.0 401 Unauthorized');
