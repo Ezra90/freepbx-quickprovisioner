@@ -89,8 +89,8 @@ switch ($action) {
 
     case 'get_device':
         $id = $_REQUEST['id'] ?? null;
-        if (!$id) { $response['message'] = 'No ID'; break; }
-        $row = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE id=?", [$id]);
+        if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
+        $row = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
         $response = ['status' => true, 'data' => $row ?: null];
         break;
 
@@ -101,22 +101,26 @@ switch ($action) {
 
     case 'delete_device':
         $id = $_REQUEST['id'] ?? null;
-        if (!$id) { $response['message'] = 'No ID'; break; }
-        $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [$id]);
+        if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
+        $db->query("DELETE FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
         \FreePBX::create()->Logger->log("Device deleted: ID=$id");
         $response = ['status' => true];
         break;
 
     case 'preview_config':
         $id = $_REQUEST['id'] ?? null;
-        if (!$id) { $response['message'] = 'No ID'; break; }
-        $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE id=?", [$id]);
+        if (!$id || !is_numeric($id)) { $response['message'] = 'Invalid ID'; break; }
+        $device = $db->getRow("SELECT * FROM quickprovisioner_devices WHERE id=?", [(int)$id]);
         if (!$device) { $response['message'] = 'Device not found'; break; }
         $model = basename($device['model']); // Sanitize to prevent path traversal
         $profile_path = $templates_dir . '/' . $model . '.json';
         if (!file_exists($profile_path)) { $response['message'] = 'Profile not found'; break; }
         $profile_json = file_get_contents($profile_path);
         $profile = json_decode($profile_json, true);
+        if ($profile === null) {
+            $response['message'] = 'Invalid template JSON for model ' . $model;
+            break;
+        }
         $custom_options = json_decode($device['custom_options_json'], true) ?? [];
         $template = $device['custom_template_override'] ? $device['custom_template_override'] : $profile['provisioning']['template'] ?? '';
         $ext = $device['extension'];
@@ -260,7 +264,10 @@ switch ($action) {
     case 'import_driver':
         $json = $_POST['json'] ?? '';
         $data = json_decode($json, true);
-        if (!$data || empty($data['model'])) { $response['message'] = 'Invalid JSON or no model'; break; }
+        if ($data === null || json_last_error() !== JSON_ERROR_NONE || empty($data['model'])) {
+            $response['message'] = 'Invalid JSON or no model field: ' . json_last_error_msg();
+            break;
+        }
         $model = basename($data['model']); // Sanitize to prevent path traversal
         $path = $templates_dir . '/' . $model . '.json';
         $result = qp_safe_write($path, $json);
