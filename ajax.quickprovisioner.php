@@ -454,6 +454,35 @@ switch ($action) {
             $response['message'] = 'Git pull failed: ' . $pull_output;
         }
         break;
+    
+    case 'restart_pbx':
+        $restart_type = isset($_POST['type']) ? $_POST['type'] : 'reload';
+        
+        if (!in_array($restart_type, ['reload', 'restart'])) {
+            $response = ['status' => false, 'message' => 'Invalid restart type'];
+            break;
+        }
+        
+        $command = ($restart_type === 'reload') ? 'fwconsole reload' : 'fwconsole restart';
+        
+        $output = [];
+        $return_var = 0;
+        exec($command . ' 2>&1', $output, $return_var);
+        
+        if ($return_var === 0) {
+            $response = [
+                'status' => true,
+                'message' => 'PBX ' . $restart_type . ' completed successfully',
+                'output' => implode("\n", $output)
+            ];
+        } else {
+            $response = [
+                'status' => false,
+                'message' => 'PBX ' . $restart_type . ' failed',
+                'output' => implode("\n", $output)
+            ];
+        }
+        break;
 }
 
 echo json_encode($response);

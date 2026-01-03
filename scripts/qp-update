@@ -1,0 +1,50 @@
+#!/bin/bash
+# qp-update - HH Quick Provisioner Update Script
+# Install to /usr/local/bin/qp-update with: sudo cp scripts/qp-update /usr/local/bin/ && sudo chmod +x /usr/local/bin/qp-update
+# Usage: sudo qp-update
+
+MODULE_DIR="/var/www/html/admin/modules/quickprovisioner"
+WEB_USER="asterisk"
+WEB_GROUP="asterisk"
+GIT_SSH_KEY="/home/hhvoip/.ssh/id_github"
+
+echo "========================================"
+echo " HH Quick Provisioner - Update Script"
+echo "========================================"
+
+cd "$MODULE_DIR" || exit 1
+
+CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
+echo "Current commit: $CURRENT_COMMIT"
+
+export GIT_SSH_COMMAND="ssh -i $GIT_SSH_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+echo ""
+echo "Fetching updates from GitHub..."
+git fetch origin 2>&1
+
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main 2>/dev/null || git rev-parse origin/master 2>/dev/null)
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+    echo "Already up to date!"
+else
+    echo "Pulling updates..."
+    git pull origin main 2>&1 || git pull origin master 2>&1
+    NEW_COMMIT=$(git rev-parse --short HEAD)
+    echo "Updated: $CURRENT_COMMIT -> $NEW_COMMIT"
+fi
+
+echo ""
+echo "Fixing permissions..."
+chown -R $WEB_USER:$WEB_GROUP "$MODULE_DIR"
+find "$MODULE_DIR" -type f -exec chmod 644 {} \;
+find "$MODULE_DIR" -type d -exec chmod 755 {} \;
+chmod 775 "$MODULE_DIR/templates" "$MODULE_DIR/assets" "$MODULE_DIR/assets/uploads" 2>/dev/null
+chmod g+s "$MODULE_DIR/templates" "$MODULE_DIR/assets" "$MODULE_DIR/assets/uploads" 2>/dev/null
+
+VERSION=$(grep -oP '(?<=<version>)[^<]+' "$MODULE_DIR/module.xml" 2>/dev/null | head -1)
+echo ""
+echo "========================================"
+echo " Done! Version: $VERSION"
+echo "========================================"
