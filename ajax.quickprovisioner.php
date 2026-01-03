@@ -463,7 +463,12 @@ switch ($action) {
             break;
         }
         
-        $command = ($restart_type === 'reload') ? 'fwconsole reload' : 'fwconsole restart';
+        // Use explicit whitelist approach for security
+        if ($restart_type === 'reload') {
+            $command = 'fwconsole reload';
+        } else {
+            $command = 'fwconsole restart';
+        }
         
         $output = [];
         $return_var = 0;
