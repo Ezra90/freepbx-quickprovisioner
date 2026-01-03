@@ -105,6 +105,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                         </div>
                         <div class="form-group">
                             <label>SIP Secret</label>
+                            <input type="hidden" id="custom_sip_secret" name="custom_sip_secret">
                             <div id="secret_preview_wrapper">
                                 <div class="input-group">
                                     <input type="text" id="sip_secret_preview" class="form-control" readonly placeholder="Select extension to auto-load">
@@ -112,7 +113,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                         <button type="button" class="btn btn-default" onclick="copyToClipboard('sip_secret_preview')" title="Copy to clipboard">
                                             <i class="fa fa-copy"></i>
                                         </button>
-                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret for reference">
+                                        <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Enter custom secret to save">
                                             <i class="fa fa-edit"></i>
                                         </button>
                                     </span>
@@ -120,15 +121,18 @@ $csrf_token = $_SESSION['qp_csrf'];
                             </div>
                             <div id="secret_custom_wrapper" style="display:none;">
                                 <div class="input-group">
-                                    <input type="text" id="sip_secret_custom" class="form-control" placeholder="Enter custom SIP secret (for reference only)">
+                                    <input type="text" id="sip_secret_custom_input" class="form-control" placeholder="Enter custom SIP secret">
                                     <span class="input-group-btn">
+                                        <button type="button" class="btn btn-success" onclick="saveCustomSecret()" title="Save custom secret">
+                                            <i class="fa fa-save"></i>
+                                        </button>
                                         <button type="button" class="btn btn-default" onclick="toggleCustomSecret()" title="Back to auto-fetch">
                                             <i class="fa fa-refresh"></i>
                                         </button>
                                     </span>
                                 </div>
                             </div>
-                            <small class="text-muted">Auto-fetched from FreePBX or enter manually for reference (not stored)</small>
+                            <small class="text-muted">Auto-fetched from FreePBX or enter custom secret (will be saved and used in provisioning)</small>
                         </div>
                         <hr>
                         <div class="form-group"><label>Model</label>
@@ -376,9 +380,15 @@ function loadDevices() {
             r.devices.forEach(function(d) {
                 var secretDisplay = '';
                 if (d.secret) {
-                    // Display secret directly in plain text
+                    // Display secret directly in plain text with source badge
                     var escapedSecret = $('<div>').text(d.secret).html();
-                    secretDisplay = '<span>' + escapedSecret + '</span>';
+                    var sourceBadge = '';
+                    if (d.secret_source === 'Custom') {
+                        sourceBadge = ' <span class="label label-info" title="Custom secret stored in database">Custom</span>';
+                    } else if (d.secret_source === 'FreePBX') {
+                        sourceBadge = ' <span class="label label-success" title="Fetched from FreePBX">FreePBX</span>';
+                    }
+                    secretDisplay = '<span>' + escapedSecret + sourceBadge + '</span>';
                 } else {
                     secretDisplay = '<span class="text-muted">N/A</span>';
                 }
@@ -427,6 +437,8 @@ function editDevice(id) {
                 $('#extension_custom_wrapper').show();
             }
 
+            // Load custom secret if available
+            $('#custom_sip_secret').val(d.custom_sip_secret || '');
             loadSipSecret(); // Load secret after extension set
             $('#model').val(d.model).trigger('change');
             $('#wallpaper').val(d.wallpaper);
@@ -468,7 +480,8 @@ function newDevice() {
     $('#extension_select_wrapper').show();
     $('#extension_custom_wrapper').hide();
     $('#sip_secret_preview').val('');
-    $('#sip_secret_custom').val('');
+    $('#sip_secret_custom_input').val('');
+    $('#custom_sip_secret').val('');
     $('#secret_preview_wrapper').show();
     $('#secret_custom_wrapper').hide();
     $('#prov_username').val('');
@@ -732,6 +745,15 @@ function loadSipSecret() {
         $('#sip_secret_preview').val('');
         return;
     }
+    
+    // First check if we have a custom secret saved for this device
+    var customSecret = $('#custom_sip_secret').val();
+    if (customSecret) {
+        $('#sip_secret_preview').val(customSecret + ' (Custom)');
+        return;
+    }
+    
+    // Otherwise fetch from FreePBX
     $.post('ajax.quickprovisioner.php', {
         action: 'get_sip_secret',
         extension: ext,
@@ -781,11 +803,42 @@ function toggleCustomSecret() {
         previewWrapper.show();
         loadSipSecret();
     } else {
-        // Switch to custom input (for reference only, not stored)
+        // Switch to custom input
         previewWrapper.hide();
         customWrapper.show();
-        $('#sip_secret_custom').focus();
+        // Pre-fill with current custom secret if exists
+        var customSecret = $('#custom_sip_secret').val();
+        if (customSecret) {
+            $('#sip_secret_custom_input').val(customSecret);
+        } else {
+            // Try to get from preview (strip " (Custom)" if present)
+            var previewVal = $('#sip_secret_preview').val();
+            if (previewVal && !previewVal.includes('Error:')) {
+                $('#sip_secret_custom_input').val(previewVal.replace(' (Custom)', ''));
+            }
+        }
+        $('#sip_secret_custom_input').focus();
     }
+}
+
+function saveCustomSecret() {
+    var secret = $('#sip_secret_custom_input').val().trim();
+    if (!secret) {
+        alert('Please enter a secret');
+        return;
+    }
+    
+    // Save to hidden field
+    $('#custom_sip_secret').val(secret);
+    
+    // Show in preview
+    $('#sip_secret_preview').val(secret + ' (Custom)');
+    
+    // Switch back to preview mode
+    $('#secret_custom_wrapper').hide();
+    $('#secret_preview_wrapper').show();
+    
+    alert('Custom secret saved. Click "Save Device" to persist to database.');
 }
 
 function copyToClipboard(id) {

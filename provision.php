@@ -77,7 +77,16 @@ $custom_options = json_decode($device['custom_options_json'], true) ?? [];
 $ext = $device['extension'];
 $userInfo = \FreePBX::Core()->getUser($ext);
 $display_name = $userInfo['name'] ?? $ext;
-$secret = \FreePBX::Core()->getDevice($ext)['secret'] ?? '';
+
+// Use custom secret if available, otherwise fetch from FreePBX
+$secret = '';
+if (!empty($device['custom_sip_secret'])) {
+    $secret = $device['custom_sip_secret'];
+} else {
+    $deviceInfo = \FreePBX::Core()->getDevice($ext);
+    $secret = $deviceInfo['secret'] ?? '';
+}
+
 $server_ip = $_SERVER['SERVER_ADDR'];
 $server_port = \FreePBX::Sipsettings()->get('bindport') ?? '5060';
 

@@ -41,6 +41,7 @@ try {
     try {
         $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN IF NOT EXISTS prov_username VARCHAR(50) DEFAULT NULL");
         $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN IF NOT EXISTS prov_password VARCHAR(100) DEFAULT NULL");
+        $db->query("ALTER TABLE quickprovisioner_devices ADD COLUMN IF NOT EXISTS custom_sip_secret VARCHAR(100) DEFAULT NULL COMMENT 'Custom SIP secret (overrides FreePBX)'");
     } catch (Exception $e) {
         // Columns may already exist
     }
