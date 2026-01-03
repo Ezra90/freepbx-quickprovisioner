@@ -24,7 +24,7 @@ if (!$authorized && isset($_SESSION['AMP_user']) && is_object($_SESSION['AMP_use
     $authorized = true;
 }
 
-// Check per-device provisioning auth
+// Check per-device provisioning auth for remote requests
 if (!$authorized && $mac && isset($_SERVER['PHP_AUTH_USER'])) {
     global $db;
     $device = $db->getRow("SELECT prov_username, prov_password FROM quickprovisioner_devices WHERE mac=?", [$mac]);
@@ -32,15 +32,6 @@ if (!$authorized && $mac && isset($_SERVER['PHP_AUTH_USER'])) {
         if ($_SERVER['PHP_AUTH_USER'] === $device['prov_username'] && ($_SERVER['PHP_AUTH_PW'] ?? '') === $device['prov_password']) {
             $authorized = true;
         }
-    }
-}
-
-// Fallback: MAC-only auth if no provisioning credentials set
-if (!$authorized && $mac) {
-    global $db;
-    $device = $db->getRow("SELECT prov_username, prov_password FROM quickprovisioner_devices WHERE mac=?", [$mac]);
-    if ($device && empty($device['prov_username']) && empty($device['prov_password'])) {
-        $authorized = true;
     }
 }
 
