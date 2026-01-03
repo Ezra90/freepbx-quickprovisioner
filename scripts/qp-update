@@ -62,8 +62,11 @@ VERSION=$(grep -oP '(?<=<version>)[^<]+' "$MODULE_DIR/module.xml" 2>/dev/null | 
 
 if [ "$UPDATES_APPLIED" -eq 1 ]; then
     echo ""
+    echo "Running FreePBX chown to fix all file permissions..."
+    sudo fwconsole chown
+    echo ""
     echo "Restarting FreePBX..."
-    if fwconsole restart; then
+    if sudo fwconsole restart; then
         echo "FreePBX restarted successfully."
     else
         echo "Warning: FreePBX restart failed. Please restart manually."
