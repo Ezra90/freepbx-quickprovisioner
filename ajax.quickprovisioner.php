@@ -43,7 +43,9 @@ function qp_safe_write($filepath, $content) {
     if (file_put_contents($filepath, $content) === false) {
         return ['status' => false, 'message' => 'Failed to write file: ' . basename($filepath)];
     }
-    chmod($filepath, 0664);
+    if (!chmod($filepath, 0664)) {
+        error_log("Quick Provisioner: Failed to set permissions on $filepath");
+    }
     return ['status' => true];
 }
 
@@ -75,7 +77,9 @@ function qp_safe_move_upload($tmp_file, $target) {
     if (!move_uploaded_file($tmp_file, $target)) {
         return ['status' => false, 'message' => 'Failed to move uploaded file'];
     }
-    chmod($target, 0664);
+    if (!chmod($target, 0664)) {
+        error_log("Quick Provisioner: Failed to set permissions on $target");
+    }
     return ['status' => true];
 }
 
@@ -442,7 +446,9 @@ switch ($action) {
                 imagedestroy($dest);
                 
                 if ($save_result) {
-                    chmod($target, 0664);
+                    if (!chmod($target, 0664)) {
+                        error_log("Quick Provisioner: Failed to set permissions on $target");
+                    }
                     \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded and resized: $filename");
                     $response = ['status' => true, 'url' => $filename];
                 } else {

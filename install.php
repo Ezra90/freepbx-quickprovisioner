@@ -80,12 +80,13 @@ foreach ($directories as $dir) {
         if (class_exists('FreePBX')) {
             FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Created directory $dir");
         }
-    }
-    // Set permissions after creation to ensure they're correct
-    if (!chmod($dir, 0775)) {
-        error_log("Quick Provisioner: Failed to set permissions on $dir");
-        if (class_exists('FreePBX')) {
-            FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to set permissions on $dir");
+    } else {
+        // Set permissions on existing directories to ensure they're correct
+        if (!chmod($dir, 0775)) {
+            error_log("Quick Provisioner: Failed to set permissions on $dir");
+            if (class_exists('FreePBX')) {
+                FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to set permissions on $dir");
+            }
         }
     }
 }
