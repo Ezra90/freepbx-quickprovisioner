@@ -12,8 +12,9 @@ function qp_is_local_network() {
 }
 
 $mac = isset($_GET['mac']) ? strtoupper(preg_replace('/[^A-F0-9]/', '', $_GET['mac'])) : null;
-if (!$mac || strlen($mac) < 12) {
+if (!$mac || strlen($mac) !== 12 || !ctype_xdigit($mac)) {
     \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Invalid MAC attempt: " . ($mac ?? 'none'));
+    http_response_code(400);
     die("Invalid or no MAC provided");
 }
 

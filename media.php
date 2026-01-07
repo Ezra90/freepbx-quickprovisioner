@@ -46,6 +46,11 @@ $req_w = (int)($_GET['w'] ?? 0);
 $req_h = (int)($_GET['h'] ?? 0);
 $mode = $_GET['mode'] ?? 'crop';
 
+// Validate mode parameter
+if (!in_array($mode, ['crop', 'fit'], true)) {
+    $mode = 'crop';
+}
+
 $path = __DIR__ . '/assets/uploads/' . basename($file);
 if (!file_exists($path) || empty($file)) {
     header('Content-Type: image/png');

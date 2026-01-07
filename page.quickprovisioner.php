@@ -774,9 +774,12 @@ function loadTemplates() {
             $('#templatesList').html('');
             $('#model').html('');
             r.list.forEach(function(t) {
-                var row = '<tr><td>' + t.model + '</td><td>' + t.display_name + '</td><td><button onclick="downloadTemplate(\'' + t.model + '\')">Download</button> <button onclick="deleteTemplate(\'' + t.model + '\')">Delete</button></td></tr>';
+                // Escape values to prevent XSS
+                var escapedModel = $('<div>').text(t.model).html();
+                var escapedDisplayName = $('<div>').text(t.display_name).html();
+                var row = '<tr><td>' + escapedModel + '</td><td>' + escapedDisplayName + '</td><td><button onclick="downloadTemplate(\'' + escapedModel.replace(/'/g, "\\'") + '\')">Download</button> <button onclick="deleteTemplate(\'' + escapedModel.replace(/'/g, "\\'") + '\')">Delete</button></td></tr>';
                 $('#templatesList').append(row);
-                $('#model').append('<option value="' + t.model + '">' + t.display_name + '</option>');
+                $('#model').append('<option value="' + escapedModel + '">' + escapedDisplayName + '</option>');
             });
         }
     }, 'json');
@@ -822,7 +825,12 @@ function loadProfile() {
 function showModelNotes() {
     var model = $('#model').val();
     var profile = profiles[model];
-    $('#modelNotes').html(profile ? profile.notes || '' : '');
+    if (profile && profile.notes) {
+        var escapedNotes = $('<div>').text(profile.notes).html();
+        $('#modelNotes').html(escapedNotes);
+    } else {
+        $('#modelNotes').html('');
+    }
 }
 
 function loadDeviceOptions() {
@@ -1221,8 +1229,19 @@ function fallbackCopyToClipboard(text) {
 function generateProvPassword() {
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
     var password = '';
-    for (var i = 0; i < 16; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    
+    // Use crypto.getRandomValues for cryptographically secure random generation
+    if (window.crypto && window.crypto.getRandomValues) {
+        var randomValues = new Uint8Array(16);
+        window.crypto.getRandomValues(randomValues);
+        for (var i = 0; i < 16; i++) {
+            password += chars.charAt(randomValues[i] % chars.length);
+        }
+    } else {
+        // Fallback for older browsers (not cryptographically secure)
+        for (var i = 0; i < 16; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
     }
     $('#prov_password').val(password);
 }
@@ -1455,7 +1474,8 @@ function updateRightColumnHeader() {
     var model = $('#model').val();
     var profile = profiles[model];
     if (profile && profile.display_name) {
-        $('#rightColumnHeader').html('<i class="fa fa-check-circle text-success"></i> ' + profile.display_name + ' Template Loaded');
+        var escapedDisplayName = $('<div>').text(profile.display_name).html();
+        $('#rightColumnHeader').html('<i class="fa fa-check-circle text-success"></i> ' + escapedDisplayName + ' Template Loaded');
     } else {
         $('#rightColumnHeader').text('Select a Model to Load Template');
     }

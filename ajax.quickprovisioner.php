@@ -1,5 +1,12 @@
 <?php
 // ajax.quickprovisioner.php - HH Quick Provisioner v2.2 - Backend API
+
+// Configuration constants
+define('QP_FREEPBX_BASE_PATH', '/var/www/html');
+define('QP_GIT_COMMAND', '/usr/bin/git');
+define('QP_FWCONSOLE_RELOAD', '/usr/sbin/fwconsole reload');
+define('QP_FWCONSOLE_RESTART', '/usr/sbin/fwconsole restart');
+
 function qp_is_local_network() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     if ($ip === '::1') return true;
@@ -100,6 +107,14 @@ switch ($action) {
             $response['message'] = 'Invalid MAC';
             break;
         }
+        // Sanitize and validate MAC address format
+        $mac_clean = strtoupper(preg_replace('/[^A-F0-9]/', '', $form['mac']));
+        if (strlen($mac_clean) !== 12 || !ctype_xdigit($mac_clean)) {
+            $response['message'] = 'Invalid MAC address format';
+            break;
+        }
+        $form['mac'] = $mac_clean;
+        
         $keys_json = $_POST['keys_json'] ?? '[]';
         $contacts_json = $_POST['contacts_json'] ?? '[]';
         $custom_options_json = json_encode($form['custom_options'] ?? []);
@@ -116,16 +131,21 @@ switch ($action) {
         }
 
         $id = $form['deviceId'] ?? null;
-        if ($id) {
-            $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=?, custom_sip_secret=? WHERE id=?";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret, $id];
-        } else {
-            $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password, custom_sip_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret];
+        try {
+            if ($id) {
+                $sql = "UPDATE quickprovisioner_devices SET mac=?, model=?, extension=?, wallpaper=?, wallpaper_mode=?, security_pin=?, keys_json=?, contacts_json=?, custom_options_json=?, custom_template_override=?, prov_username=?, prov_password=?, custom_sip_secret=? WHERE id=?";
+                $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret, $id];
+            } else {
+                $sql = "INSERT INTO quickprovisioner_devices (mac, model, extension, wallpaper, wallpaper_mode, security_pin, keys_json, contacts_json, custom_options_json, custom_template_override, prov_username, prov_password, custom_sip_secret) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $params = [$form['mac'], $form['model'], $form['extension'], $wallpaper, $wallpaper_mode, $security_pin, $keys_json, $contacts_json, $custom_options_json, $custom_template_override, $prov_username, $prov_password, $custom_sip_secret];
+            }
+            $db->query($sql, $params);
+            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Device saved: MAC=" . $form['mac']);
+            $response = ['status' => true];
+        } catch (Exception $e) {
+            error_log("Quick Provisioner: Error saving device - " . $e->getMessage());
+            $response['message'] = 'Database error: Failed to save device';
         }
-        $db->query($sql, $params);
-        \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Device saved: MAC=" . $form['mac']);
-        $response = ['status' => true];
         break;
 
     case 'get_device':
@@ -258,6 +278,8 @@ switch ($action) {
             '{{wallpaper}}' => $wpUrl,
             '{{security_pin}}' => $device['security_pin'] ?? ''
         ];
+        // Decode custom options from device
+        $custom_options = json_decode($device['custom_options_json'], true) ?? [];
         foreach ($custom_options as $key => $value) {
             if ($value !== '') {
                 $vars['{{' . $key . '}}'] = htmlspecialchars($value);
@@ -580,40 +602,50 @@ switch ($action) {
     // === UPDATE MANAGEMENT ACTIONS ===
     case 'check_updates':
         $module_dir = __DIR__;
+        
+        // Validate module_dir is within expected path for security
+        $real_module_dir = realpath($module_dir);
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
+            $response['message'] = 'Invalid module directory';
+            break;
+        }
 
+        // Use explicit git commands with -C flag to avoid cd command injection
+        $git_cmd = QP_GIT_COMMAND . ' -C ' . escapeshellarg($real_module_dir);
+        
         // Get current commit hash
-        $current_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+        $current_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
         if (empty($current_commit) || strlen($current_commit) !== 40) {
             $response['message'] = 'Failed to get current commit: ' . $current_commit;
             break;
         }
 
         // Get current version from module.xml
-        $module_xml_path = $module_dir . '/module.xml';
+        $module_xml_path = $real_module_dir . '/module.xml';
         $current_version = '2.1.0'; // Default
         if (file_exists($module_xml_path)) {
             $xml_content = @file_get_contents($module_xml_path);
             if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {
-                $current_version = $matches[1];
+                $current_version = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
             }
         }
 
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
 
         // Fetch from origin
-        $fetch_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git fetch origin main 2>&1");
+        $fetch_output = shell_exec($git_cmd . ' fetch origin main 2>&1');
 
         // Get remote commit hash
-        $remote_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse origin/main 2>&1"));
+        $remote_commit = trim(shell_exec($git_cmd . ' rev-parse origin/main 2>&1'));
         if (empty($remote_commit) || strlen($remote_commit) !== 40) {
-            $response['message'] = 'Failed to get remote commit. Fetch output: ' . $fetch_output;
+            $response['message'] = 'Failed to get remote commit. Fetch output: ' . htmlspecialchars($fetch_output, ENT_QUOTES, 'UTF-8');
             break;
         }
 
@@ -638,20 +670,34 @@ switch ($action) {
             $response['message'] = 'Missing commit parameters';
             break;
         }
+        
+        // Validate commit hashes are valid SHA-1 (40 hex chars)
+        if (!preg_match('/^[a-f0-9]{40}$/i', $current_commit) || !preg_match('/^[a-f0-9]{40}$/i', $remote_commit)) {
+            $response['message'] = 'Invalid commit hash format';
+            break;
+        }
+        
+        // Validate module_dir is within expected path for security
+        $real_module_dir = realpath($module_dir);
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
+            $response['message'] = 'Invalid module directory';
+            break;
+        }
 
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
 
-        // Get list of commits between current and remote
+        // Use git -C instead of cd for security
+        $git_cmd = '/usr/bin/git -C ' . escapeshellarg($real_module_dir);
         $log_cmd = sprintf(
-            "cd %s && git log %s..%s --pretty=format:'%%H||%%s||%%an||%%ai' 2>&1",
-            escapeshellarg($module_dir),
+            "%s log %s..%s --pretty=format:'%%H||%%s||%%an||%%ai' 2>&1",
+            $git_cmd,
             escapeshellarg($current_commit),
             escapeshellarg($remote_commit)
         );
@@ -665,9 +711,9 @@ switch ($action) {
                 $parts = explode('||', $line);
                 if (count($parts) >= 4) {
                     $commits[] = [
-                        'hash' => $parts[0],
-                        'message' => $parts[1],
-                        'author' => $parts[2],
+                        'hash' => htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8'),
+                        'message' => htmlspecialchars($parts[1], ENT_QUOTES, 'UTF-8'),
+                        'author' => htmlspecialchars($parts[2], ENT_QUOTES, 'UTF-8'),
                         'date' => $parts[3]
                     ];
                 }
@@ -682,34 +728,44 @@ switch ($action) {
 
     case 'perform_update':
         $module_dir = __DIR__;
+        
+        // Validate module_dir is within expected path for security
+        $real_module_dir = realpath($module_dir);
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
+            $response['message'] = 'Invalid module directory';
+            break;
+        }
+        
+        // Use git -C instead of cd for security
+        $git_cmd = QP_GIT_COMMAND . ' -C ' . escapeshellarg($real_module_dir);
 
         // Get current commit before update
-        $old_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+        $old_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
 
         // Set SSH key for git operations if it exists
         $ssh_key_path = '/home/hhvoip/.ssh/id_github';
         if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . $ssh_key_path . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
+            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
         } else {
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
 
         // Perform git pull
-        $pull_output = shell_exec("cd " . escapeshellarg($module_dir) . " && git pull origin main 2>&1");
+        $pull_output = shell_exec($git_cmd . ' pull origin main 2>&1');
 
         // Check if pull was successful
         if (strpos($pull_output, 'Already up to date') !== false || strpos($pull_output, 'Fast-forward') !== false || strpos($pull_output, 'Updating') !== false) {
             // Get new commit hash
-            $new_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+            $new_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
 
             // Get new version from module.xml
-            $module_xml_path = $module_dir . '/module.xml';
+            $module_xml_path = $real_module_dir . '/module.xml';
             $new_version = null;
             if (file_exists($module_xml_path)) {
                 $xml_content = @file_get_contents($module_xml_path);
                 if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {
-                    $new_version = $matches[1];
+                    $new_version = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
                 }
             }
 
@@ -733,17 +789,17 @@ switch ($action) {
     case 'restart_pbx':
         $restart_type = isset($_POST['type']) ? $_POST['type'] : 'reload';
 
-        if (!in_array($restart_type, ['reload', 'restart'])) {
+        if (!in_array($restart_type, ['reload', 'restart'], true)) {
             $response = ['status' => false, 'message' => 'Invalid restart type'];
             break;
         }
 
-        // Use explicit whitelist approach for security
-        if ($restart_type === 'reload') {
-            $command = 'fwconsole reload';
-        } else {
-            $command = 'fwconsole restart';
-        }
+        // Use explicit command mapping with constants for security
+        $allowed_commands = [
+            'reload' => QP_FWCONSOLE_RELOAD,
+            'restart' => QP_FWCONSOLE_RESTART
+        ];
+        $command = $allowed_commands[$restart_type];
 
         $output = [];
         $return_var = 0;
