@@ -1229,8 +1229,19 @@ function fallbackCopyToClipboard(text) {
 function generateProvPassword() {
     var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
     var password = '';
-    for (var i = 0; i < 16; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    
+    // Use crypto.getRandomValues for cryptographically secure random generation
+    if (window.crypto && window.crypto.getRandomValues) {
+        var randomValues = new Uint8Array(16);
+        window.crypto.getRandomValues(randomValues);
+        for (var i = 0; i < 16; i++) {
+            password += chars.charAt(randomValues[i] % chars.length);
+        }
+    } else {
+        // Fallback for older browsers (not cryptographically secure)
+        for (var i = 0; i < 16; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
     }
     $('#prov_password').val(password);
 }
