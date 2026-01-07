@@ -629,7 +629,7 @@ var profiles = {};
 var smartDialShortcuts = {}; // Stores digit => extension mappings
 
 function loadDevices() {
-    $.post('ajax.quickprovisioner.php', {action:'list_devices_with_secrets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=list_devices_with_secrets', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             $('#deviceListBody').html('');
             r.devices.forEach(function(d) {
@@ -664,7 +664,7 @@ function loadDevices() {
 
 function editDevice(id) {
     currentDeviceId = id;
-    $.post('ajax.quickprovisioner.php', {action:'get_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=get_device', {id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             var d = r.data;
             $('#deviceId').val(d.id);
@@ -732,7 +732,7 @@ function editDevice(id) {
 
 function deleteDevice(id) {
     if (confirm('Delete device?')) {
-        $.post('ajax.quickprovisioner.php', {action:'delete_device', id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+        $.post('ajax.php?module=quickprovisioner&command=delete_device', {id:id, csrf_token: '<?= $csrf_token ?>'}, function(r) {
             if (r.status) {
                 alert('Device deleted');
                 loadDevices();
@@ -769,7 +769,7 @@ function newDevice() {
 }
 
 function loadTemplates() {
-    $.post('ajax.quickprovisioner.php', {action:'list_drivers', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=list_drivers', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             $('#templatesList').html('');
             $('#model').html('');
@@ -790,7 +790,7 @@ function loadProfile() {
     }
     console.log('Loading template for model:', model);
     
-    $.post('ajax.quickprovisioner.php', {action:'get_driver', model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=get_driver', {model:model, csrf_token: '<?= $csrf_token ?>'}, function(r) {
         console.log('Template response:', r);
         if (r.status) {
             try {
@@ -1003,7 +1003,7 @@ function clearKey() {
 
 function previewConfig() {
     if (!currentDeviceId) return alert('Save device first');
-    $.post('ajax.quickprovisioner.php', {action:'preview_config', id:currentDeviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=preview_config', {id:currentDeviceId, csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             $('#configPreview').val(r.config);
             $('#configPreviewModal').modal('show');
@@ -1020,8 +1020,7 @@ function importDriver() {
         return;
     }
     $('#importFeedback').html('<div class="alert alert-info">Importing...</div>');
-    $.post('ajax.quickprovisioner.php', {
-        action: 'import_driver',
+    $.post('ajax.php?module=quickprovisioner&command=import_driver', {
         json: json,
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
@@ -1098,8 +1097,7 @@ function loadSipSecret() {
     }
 
     // Otherwise fetch from FreePBX
-    $.post('ajax.quickprovisioner.php', {
-        action: 'get_sip_secret',
+    $.post('ajax.php?module=quickprovisioner&command=get_sip_secret', {
         extension: ext,
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
@@ -1230,7 +1228,7 @@ function generateProvPassword() {
 }
 
 function loadAssets() {
-    $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=list_assets', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             var html = '';
             r.files.forEach(function(file) {
@@ -1281,7 +1279,7 @@ function updateWallpaperPreview(filename) {
 
 function deleteAsset(filename) {
     if (!confirm('Delete ' + filename + '?')) return;
-    $.post('ajax.quickprovisioner.php', {action: 'delete_asset', filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=delete_asset', {filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             loadAssets();
         } else {
@@ -1369,10 +1367,9 @@ function uploadAsset() {
     if (!file) return alert('Select file');
     var fd = new FormData();
     fd.append('file', file);
-    fd.append('action', 'upload_file');
     fd.append('csrf_token', '<?= $csrf_token ?>');
     $.ajax({
-        url: 'ajax.quickprovisioner.php',
+        url: 'ajax.php?module=quickprovisioner&command=upload_file',
         type: 'POST',
         data: fd,
         contentType: false,
@@ -1433,13 +1430,13 @@ $('#deviceForm').submit(function(e) {
     var serializedData = $.param(formData);
     
     var data = {
-        action: 'save_device',
         data: serializedData,
         keys_json: JSON.stringify(currentKeys),
-        contacts_json: JSON.stringify(currentContacts)
+        contacts_json: JSON.stringify(currentContacts),
+        csrf_token: '<?= $csrf_token ?>'
     };
 
-    $.post('ajax.quickprovisioner.php', data, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=save_device', data, function(r) {
         if (r.status) {
             alert('Saved!');
             loadDevices();
@@ -1584,7 +1581,6 @@ function uploadWallpaper() {
     
     var fd = new FormData();
     fd.append('file', file);
-    fd.append('action', 'upload_file');
     fd.append('csrf_token', '<?= $csrf_token ?>');
     
     // Get target dimensions from loaded profile
@@ -1600,7 +1596,7 @@ function uploadWallpaper() {
     }
     
     $.ajax({
-        url: 'ajax.quickprovisioner.php',
+        url: 'ajax.php?module=quickprovisioner&command=upload_file',
         type: 'POST',
         data: fd,
         contentType: false,
@@ -1647,7 +1643,7 @@ function selectWallpaperFromGallery(filename) {
 }
 
 function loadAssetGallery() {
-    $.post('ajax.quickprovisioner.php', {action: 'list_assets', csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=list_assets', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             var html = '';
             r.files.forEach(function(file) {
@@ -1671,7 +1667,7 @@ function loadAssetGallery() {
 
 function deleteAssetFromGallery(filename) {
     if (!confirm('Delete ' + filename + '?')) return;
-    $.post('ajax.quickprovisioner.php', {action: 'delete_asset', filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
+    $.post('ajax.php?module=quickprovisioner&command=delete_asset', {filename: filename, csrf_token: '<?= $csrf_token ?>'}, function(r) {
         if (r.status) {
             loadAssetGallery();
             // If this was the selected wallpaper, clear it
@@ -1697,8 +1693,7 @@ function checkForUpdates() {
     $('#updateStatus').hide();
     $('#updateResult').hide();
 
-    $.post('ajax.quickprovisioner.php', {
-        action: 'check_updates',
+    $.post('ajax.php?module=quickprovisioner&command=check_updates', {
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
         $('#checkUpdatesBtn').prop('disabled', false).text('Check for Updates');
@@ -1726,8 +1721,7 @@ function checkForUpdates() {
 }
 
 function loadChangelog(currentCommit, remoteCommit) {
-    $.post('ajax.quickprovisioner.php', {
-        action: 'get_changelog',
+    $.post('ajax.php?module=quickprovisioner&command=get_changelog', {
         current_commit: currentCommit,
         remote_commit: remoteCommit,
         csrf_token: '<?= $csrf_token ?>'
@@ -1763,8 +1757,7 @@ function performUpdate() {
     $('#changelogSection').hide();
     $('#updateStatusMessage').html('<div class="alert alert-info">Updating... Please wait...</div>');
 
-    $.post('ajax.quickprovisioner.php', {
-        action: 'perform_update',
+    $.post('ajax.php?module=quickprovisioner&command=perform_update', {
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
         $('#confirmUpdateBtn').prop('disabled', false).text('Yes, Update Now');
@@ -1839,8 +1832,7 @@ function reloadPBX() {
 
     $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Reloading...');
 
-    $.post('ajax.quickprovisioner.php', {
-        action: 'restart_pbx',
+    $.post('ajax.php?module=quickprovisioner&command=restart_pbx', {
         type: 'reload',
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
@@ -1857,8 +1849,7 @@ function restartPBX() {
 
     $('#pbxStatus').html('<i class="fa fa-spinner fa-spin"></i> Restarting PBX...');
 
-    $.post('ajax.quickprovisioner.php', {
-        action: 'restart_pbx',
+    $.post('ajax.php?module=quickprovisioner&command=restart_pbx', {
         type: 'restart',
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
@@ -1872,8 +1863,7 @@ function restartPBX() {
 
 // Load current commit on page load
 $(document).ready(function() {
-    $.post('ajax.quickprovisioner.php', {
-        action: 'check_updates',
+    $.post('ajax.php?module=quickprovisioner&command=check_updates', {
         csrf_token: '<?= $csrf_token ?>'
     }, function(r) {
         if (r.status && r.current_commit) {
