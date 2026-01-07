@@ -28,14 +28,22 @@ $response = ['status' => false, 'message' => 'Invalid action'];
 function qp_safe_write($filepath, $content) {
     $dir = dirname($filepath);
     if (!is_dir($dir)) {
+        $old_umask = umask(0);
         if (!mkdir($dir, 0775, true)) {
-            return ['status' => false, 'message' => 'Failed to create directory'];
+            umask($old_umask);
+            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
         }
+        umask($old_umask);
     }
+    
+    if (!is_writable($dir)) {
+        return ['status' => false, 'message' => 'Directory not writable: ' . $dir];
+    }
+    
     if (file_put_contents($filepath, $content) === false) {
         return ['status' => false, 'message' => 'Failed to write file: ' . basename($filepath)];
     }
-    chmod($filepath, 0644);
+    chmod($filepath, 0664);
     return ['status' => true];
 }
 
@@ -52,14 +60,22 @@ function qp_safe_delete($filepath) {
 function qp_safe_move_upload($tmp_file, $target) {
     $dir = dirname($target);
     if (!is_dir($dir)) {
+        $old_umask = umask(0);
         if (!mkdir($dir, 0775, true)) {
-            return ['status' => false, 'message' => 'Failed to create directory'];
+            umask($old_umask);
+            return ['status' => false, 'message' => 'Failed to create directory: ' . $dir];
         }
+        umask($old_umask);
     }
+    
+    if (!is_writable($dir)) {
+        return ['status' => false, 'message' => 'Directory not writable: ' . $dir];
+    }
+    
     if (!move_uploaded_file($tmp_file, $target)) {
         return ['status' => false, 'message' => 'Failed to move uploaded file'];
     }
-    chmod($target, 0644);
+    chmod($target, 0664);
     return ['status' => true];
 }
 
@@ -426,7 +442,7 @@ switch ($action) {
                 imagedestroy($dest);
                 
                 if ($save_result) {
-                    chmod($target, 0644);
+                    chmod($target, 0664);
                     \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Asset uploaded and resized: $filename");
                     $response = ['status' => true, 'url' => $filename];
                 } else {
@@ -690,24 +706,8 @@ switch ($action) {
                 }
             }
 
-            // Fix permissions with targeted approach
-            // Note: These commands may require sudo privileges that might not be available
-
-            // Set ownership
-            $chown_result = @shell_exec("chown -R asterisk:asterisk " . escapeshellarg($module_dir) . " 2>&1");
-            if ($chown_result !== null && strpos($chown_result, 'Operation not permitted') === false) {
-                \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Ownership updated successfully");
-            } else {
-                \FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Unable to update ownership (may require elevated privileges)");
-            }
-
-            // Set directory permissions to 755
-            $chmod_dir_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type d -exec chmod 755 {} \\; 2>&1");
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Directory permissions set to 755");
-
-            // Set file permissions to 644
-            $chmod_file_result = @shell_exec("find " . escapeshellarg($module_dir) . " -type f -exec chmod 644 {} \\; 2>&1");
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: File permissions set to 644");
+            // Note: Permission/ownership changes require elevated privileges.
+            // If needed, run 'fwconsole chown' manually or use the qp-update script with sudo.
 
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Module updated: $old_commit -> $new_commit");
 
