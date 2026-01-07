@@ -713,7 +713,7 @@ switch ($action) {
             }
 
             // Note: Permission/ownership changes require elevated privileges.
-            // If needed, run 'fwconsole chown' manually or use the qp-update script with sudo.
+            // If needed, run 'fwconsole chown' manually or use the scripts/qp-update script with sudo.
 
             \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Module updated: $old_commit -> $new_commit");
 

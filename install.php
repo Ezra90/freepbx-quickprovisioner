@@ -108,7 +108,12 @@ if (is_dir($uploads_dir)) {
                 FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to create .htaccess in $uploads_dir");
             }
         } else {
-            chmod($htaccess_path, 0664);
+            if (!chmod($htaccess_path, 0664)) {
+                error_log("Quick Provisioner: Failed to set permissions on $htaccess_path");
+                if (class_exists('FreePBX')) {
+                    FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to set permissions on $htaccess_path");
+                }
+            }
         }
     }
 }
@@ -128,7 +133,12 @@ if (is_dir($templates_dir)) {
                 FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to create .htaccess in $templates_dir");
             }
         } else {
-            chmod($htaccess_path, 0664);
+            if (!chmod($htaccess_path, 0664)) {
+                error_log("Quick Provisioner: Failed to set permissions on $htaccess_path");
+                if (class_exists('FreePBX')) {
+                    FreePBX::create()->Logger->log(FPBX_LOG_WARNING, "Quick Provisioner: Failed to set permissions on $htaccess_path");
+                }
+            }
             if (class_exists('FreePBX')) {
                 FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Created .htaccess for templates directory");
             }
