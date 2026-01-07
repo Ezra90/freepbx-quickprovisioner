@@ -19,10 +19,15 @@ class Quickprovisioner extends \FreePBX_Helpers implements \BMO {
         switch($action) {
             case 'restart_pbx':
                 $type = isset($_POST['type']) ? $_POST['type'] : 'reload';
-                if (! in_array($type, array('reload', 'restart'))) {
+                if (! in_array($type, array('reload', 'restart'), true)) {
                     return array('status' => false, 'message' => 'Invalid restart type');
                 }
-                $cmd = ($type === 'reload') ? 'fwconsole reload' : 'fwconsole restart';
+                // Use explicit command mapping for security
+                $allowed_commands = [
+                    'reload' => '/usr/sbin/fwconsole reload',
+                    'restart' => '/usr/sbin/fwconsole restart'
+                ];
+                $cmd = $allowed_commands[$type];
                 $output = array();
                 $return_var = 0;
                 exec($cmd . ' 2>&1', $output, $return_var);
@@ -35,7 +40,14 @@ class Quickprovisioner extends \FreePBX_Helpers implements \BMO {
                 
             case 'check_updates':
                 $module_dir = dirname(__FILE__);
-                $current_commit = trim(shell_exec("cd " . escapeshellarg($module_dir) . " && git rev-parse HEAD 2>&1"));
+                // Validate module_dir is within expected path for security
+                $real_module_dir = realpath($module_dir);
+                if ($real_module_dir === false || strpos($real_module_dir, '/var/www/html') !== 0) {
+                    return array('status' => false, 'current_commit' => '', 'message' => 'Invalid module directory');
+                }
+                // Use explicit git commands with full path for security
+                $git_cmd = '/usr/bin/git -C ' . escapeshellarg($real_module_dir);
+                $current_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
                 return array('status' => true, 'current_commit' => $current_commit);
                 break;
                 
