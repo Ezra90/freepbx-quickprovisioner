@@ -1,5 +1,12 @@
 <?php
 // ajax.quickprovisioner.php - HH Quick Provisioner v2.2 - Backend API
+
+// Configuration constants
+define('QP_FREEPBX_BASE_PATH', '/var/www/html');
+define('QP_GIT_COMMAND', '/usr/bin/git');
+define('QP_FWCONSOLE_RELOAD', '/usr/sbin/fwconsole reload');
+define('QP_FWCONSOLE_RESTART', '/usr/sbin/fwconsole restart');
+
 function qp_is_local_network() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     if ($ip === '::1') return true;
@@ -598,13 +605,13 @@ switch ($action) {
         
         // Validate module_dir is within expected path for security
         $real_module_dir = realpath($module_dir);
-        if ($real_module_dir === false || strpos($real_module_dir, '/var/www/html') !== 0) {
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
             $response['message'] = 'Invalid module directory';
             break;
         }
 
         // Use explicit git commands with -C flag to avoid cd command injection
-        $git_cmd = '/usr/bin/git -C ' . escapeshellarg($real_module_dir);
+        $git_cmd = QP_GIT_COMMAND . ' -C ' . escapeshellarg($real_module_dir);
         
         // Get current commit hash
         $current_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
@@ -672,7 +679,7 @@ switch ($action) {
         
         // Validate module_dir is within expected path for security
         $real_module_dir = realpath($module_dir);
-        if ($real_module_dir === false || strpos($real_module_dir, '/var/www/html') !== 0) {
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
             $response['message'] = 'Invalid module directory';
             break;
         }
@@ -724,13 +731,13 @@ switch ($action) {
         
         // Validate module_dir is within expected path for security
         $real_module_dir = realpath($module_dir);
-        if ($real_module_dir === false || strpos($real_module_dir, '/var/www/html') !== 0) {
+        if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
             $response['message'] = 'Invalid module directory';
             break;
         }
         
         // Use git -C instead of cd for security
-        $git_cmd = '/usr/bin/git -C ' . escapeshellarg($real_module_dir);
+        $git_cmd = QP_GIT_COMMAND . ' -C ' . escapeshellarg($real_module_dir);
 
         // Get current commit before update
         $old_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
@@ -787,10 +794,10 @@ switch ($action) {
             break;
         }
 
-        // Use explicit command mapping with full path for security
+        // Use explicit command mapping with constants for security
         $allowed_commands = [
-            'reload' => '/usr/sbin/fwconsole reload',
-            'restart' => '/usr/sbin/fwconsole restart'
+            'reload' => QP_FWCONSOLE_RELOAD,
+            'restart' => QP_FWCONSOLE_RESTART
         ];
         $command = $allowed_commands[$restart_type];
 
