@@ -21,7 +21,7 @@ global $db;
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Support both 'action' (backward compatibility) and 'command' (FreePBX routing)
+// Support both 'command' (FreePBX routing via ajax.php) and 'action' (backward compatibility for direct calls)
 $action = $_REQUEST['command'] ?? $_REQUEST['action'] ?? '';
 $response = ['status' => false, 'message' => 'Invalid action'];
 

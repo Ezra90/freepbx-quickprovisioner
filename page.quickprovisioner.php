@@ -1432,8 +1432,7 @@ $('#deviceForm').submit(function(e) {
     var data = {
         data: serializedData,
         keys_json: JSON.stringify(currentKeys),
-        contacts_json: JSON.stringify(currentContacts),
-        csrf_token: '<?= $csrf_token ?>'
+        contacts_json: JSON.stringify(currentContacts)
     };
 
     $.post('ajax.php?module=quickprovisioner&command=save_device', data, function(r) {
