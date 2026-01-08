@@ -933,7 +933,7 @@ function updatePageSelect() {
 function renderPreview() {
     var model = $('#model').val();
     var profile = profiles[model];
-    if (!profile) return;
+    if (!profile || !profile.visual_editor) return;
     var ve = profile.visual_editor;
     var page = parseInt($('#pageSelect').val()) || 1;
     var wallpaper = $('#wallpaper').val();
@@ -1007,7 +1007,7 @@ function renderPreview() {
         var showKey = true;
         
         // For expandable layouts, check collapsed/expanded state
-        if (profile.visual_editor.expandable_layout) {
+        if (ve.expandable_layout) {
             if (!isExpandedView) {
                 // Collapsed view: only show column 1 (keys 1-6) and key 7
                 showKey = (key.column === 1) || (key.index === 7);
