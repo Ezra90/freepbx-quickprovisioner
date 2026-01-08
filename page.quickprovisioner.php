@@ -1105,32 +1105,35 @@ function showExampleJSON() {
     $('#driverInput').val(example);
 }
 
+// Helper function to auto-fill Button 1 with extension
+function autoFillButton1(ext) {
+    if (!ext) return;
+    
+    // Check if Button 1 (index 1) already exists
+    var button1 = currentKeys.find(k => k.index === 1);
+    if (!button1) {
+        // Add Button 1 as a line key
+        currentKeys.push({
+            index: 1,
+            type: 'line',
+            label: ext,
+            value: ext
+        });
+    } else if (!button1.type || button1.type === '') {
+        // Update Button 1 if it exists but is empty
+        button1.type = 'line';
+        button1.label = ext;
+        button1.value = ext;
+    }
+    // Refresh the preview to show the auto-filled button
+    renderPreview();
+}
+
 function extensionSelectChanged() {
     var ext = $('#extension_select').val();
     $('#extension').val(ext);
     loadSipSecret();
-    
-    // Auto-fill Button 1 with Line key when extension is selected
-    if (ext) {
-        // Check if Button 1 (index 1) already exists
-        var button1 = currentKeys.find(k => k.index === 1);
-        if (!button1) {
-            // Add Button 1 as a line key
-            currentKeys.push({
-                index: 1,
-                type: 'line',
-                label: ext,
-                value: ext
-            });
-        } else if (!button1.type || button1.type === '') {
-            // Update Button 1 if it exists but is empty
-            button1.type = 'line';
-            button1.label = ext;
-            button1.value = ext;
-        }
-        // Refresh the preview to show the auto-filled button
-        renderPreview();
-    }
+    autoFillButton1(ext);
 }
 
 function loadSipSecret() {
@@ -1185,28 +1188,7 @@ function customExtensionChanged() {
     $('#extension').val(ext);
     // Clear secret when custom extension is changed
     $('#sip_secret_preview').val('');
-    
-    // Auto-fill Button 1 with Line key when extension is entered
-    if (ext) {
-        // Check if Button 1 (index 1) already exists
-        var button1 = currentKeys.find(k => k.index === 1);
-        if (!button1) {
-            // Add Button 1 as a line key
-            currentKeys.push({
-                index: 1,
-                type: 'line',
-                label: ext,
-                value: ext
-            });
-        } else if (!button1.type || button1.type === '') {
-            // Update Button 1 if it exists but is empty
-            button1.type = 'line';
-            button1.label = ext;
-            button1.value = ext;
-        }
-        // Refresh the preview to show the auto-filled button
-        renderPreview();
-    }
+    autoFillButton1(ext);
 }
 
 function toggleCustomSecret() {
