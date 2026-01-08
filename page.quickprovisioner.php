@@ -325,7 +325,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                             <div class="panel-body">
                                                 <div class="form-group">
                                                     <label>SIP Server Host</label>
-                                                    <input type="text" name="custom_options[sip_server.host]" class="form-control" placeholder="FreePBX domain or IP">
+                                                    <input type="text" id="sipServerHost" name="custom_options[sip_server.host]" class="form-control" placeholder="FreePBX domain or IP">
                                                     <small class="text-muted">Leave blank to use FreePBX server. Override for remote scenarios.</small>
                                                 </div>
                                                 <div class="form-group">
@@ -441,7 +441,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                             <button type="button" id="toggleExpandBtn" class="btn btn-default" onclick="toggleExpandedView()">
                                                 <i class="fa fa-plus"></i> More
                                             </button>
-                                            <span id="expandedViewLabel" class="text-muted" style="margin-left: 10px;">Showing collapsed view (Keys 1-6, 7)</span>
+                                            <span id="expandedViewLabel" class="text-muted" style="margin-left: 10px;">Showing collapsed view (Keys 1-6, 7-11)</span>
                                         </div>
 
                                         <!-- Visual Preview -->
@@ -814,6 +814,7 @@ function loadProfile() {
                 updateRightColumnHeader();
                 updateScreenDimensions();
                 prefillAutoProvisionUrl();
+                prefillSipServerHost();
                 renderPreview();
                 updateHandsetSettingsPreview();
                 loadAssetGallery();
@@ -847,44 +848,83 @@ function loadDeviceOptions() {
     var profile = profiles[model];
     var html = '';
     if (profile && profile.configurable_options) {
+        // Group options by category
+        var categories = {};
+        var categoryLabels = {
+            'security': 'Security Settings',
+            'display': 'Display Settings',
+            'provisioning': 'Provisioning Settings',
+            'dialing': 'Dialing Settings',
+            'features': 'Feature Settings'
+        };
+        
+        // Group options by category
         profile.configurable_options.forEach(function(opt) {
-            html += '<div class="form-group">';
-            // Label with required indicator
-            html += '<label title="' + (opt.description || '') + '">';
-            html += opt.label;
-            if (opt.required) {
-                html += ' <span class="text-danger">*</span>';
+            var cat = opt.category || 'other';
+            if (!categories[cat]) {
+                categories[cat] = [];
             }
-            html += '</label>';
+            categories[cat].push(opt);
+        });
+        
+        // Render each category as a collapsible panel
+        var categoryOrder = ['security', 'display', 'provisioning', 'dialing', 'features', 'other'];
+        categoryOrder.forEach(function(cat) {
+            if (!categories[cat]) return;
             
-            // Field based on type
-            if (opt.type === 'bool') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
-                html += '<option value="">Default (' + opt.default + ')</option>';
-                html += '<option value="1">On</option>';
-                html += '<option value="0">Off</option>';
-                html += '</select>';
-            } else if (opt.type === 'select') {
-                html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
-                html += '<option value="">Default (' + opt.default + ')</option>';
-                for (var val in opt.options) {
-                    html += '<option value="' + val + '">' + opt.options[val] + '</option>';
-                }
-                html += '</select>';
-            } else if (opt.type === 'number') {
-                html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" ';
-                html += 'min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" ';
-                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
-            } else {
-                html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" ';
-                html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
-            }
+            var catLabel = categoryLabels[cat] || 'Other Settings';
+            var catId = 'category_' + cat;
             
-            // Description help text
-            if (opt.description) {
-                html += '<small class="help-block text-muted">' + opt.description + '</small>';
-            }
+            html += '<div class="panel panel-default">';
+            html += '<div class="panel-heading" style="cursor: pointer;" onclick="$(\'#' + catId + '\').collapse(\'toggle\')">';
+            html += '<h4 class="panel-title">';
+            html += '<i class="fa fa-chevron-down"></i> ' + catLabel;
+            html += '</h4>';
             html += '</div>';
+            html += '<div id="' + catId + '" class="panel-collapse collapse in">';
+            html += '<div class="panel-body">';
+            
+            categories[cat].forEach(function(opt) {
+                html += '<div class="form-group">';
+                // Label with required indicator
+                html += '<label title="' + (opt.description || '') + '">';
+                html += opt.label;
+                if (opt.required) {
+                    html += ' <span class="text-danger">*</span>';
+                }
+                html += '</label>';
+                
+                // Field based on type
+                if (opt.type === 'bool') {
+                    html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                    html += '<option value="">Default (' + opt.default + ')</option>';
+                    html += '<option value="1">On</option>';
+                    html += '<option value="0">Off</option>';
+                    html += '</select>';
+                } else if (opt.type === 'select') {
+                    html += '<select name="custom_options[' + opt.name + ']" class="form-control"' + (opt.required ? ' required' : '') + '>';
+                    html += '<option value="">Default (' + opt.default + ')</option>';
+                    for (var val in opt.options) {
+                        html += '<option value="' + val + '">' + opt.options[val] + '</option>';
+                    }
+                    html += '</select>';
+                } else if (opt.type === 'number') {
+                    html += '<input type="number" name="custom_options[' + opt.name + ']" class="form-control" ';
+                    html += 'min="' + (opt.min || '') + '" max="' + (opt.max || '') + '" ';
+                    html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+                } else {
+                    html += '<input type="text" name="custom_options[' + opt.name + ']" class="form-control" ';
+                    html += 'placeholder="Default: ' + opt.default + '"' + (opt.required ? ' required' : '') + '>';
+                }
+                
+                // Description help text
+                if (opt.description) {
+                    html += '<small class="help-block text-muted">' + opt.description + '</small>';
+                }
+                html += '</div>';
+            });
+            
+            html += '</div></div></div>';
         });
     }
     $('#deviceOptions').html(html);
@@ -897,7 +937,7 @@ function toggleExpandedView() {
         $('#expandedViewLabel').text('Showing expanded view (all keys)');
     } else {
         $('#toggleExpandBtn').html('<i class="fa fa-plus"></i> More');
-        $('#expandedViewLabel').text('Showing collapsed view (Keys 1-6, 7)');
+        $('#expandedViewLabel').text('Showing collapsed view (Keys 1-6, 7-11)');
     }
     renderPreview();
 }
@@ -909,13 +949,11 @@ function updatePageSelect() {
     
     // Check if this profile uses expandable layout
     if (profile.visual_editor && profile.visual_editor.expandable_layout) {
-        // Hide page selector, show More/Hide toggle
+        // Hide page selector and external toggle button (button now inside preview)
         $('#pageSelectorGroup').hide();
-        $('#toggleExpandGroup').show();
+        $('#toggleExpandGroup').hide();
         // Reset to collapsed view when switching models
         isExpandedView = false;
-        $('#toggleExpandBtn').html('<i class="fa fa-plus"></i> More');
-        $('#expandedViewLabel').text('Showing collapsed view (Keys 1-6, 7)');
     } else {
         // Show page selector, hide More/Hide toggle
         $('#pageSelectorGroup').show();
@@ -1009,8 +1047,8 @@ function renderPreview() {
         // For expandable layouts, check collapsed/expanded state
         if (ve.expandable_layout) {
             if (!isExpandedView) {
-                // Collapsed view: only show column 1 (keys 1-6) and key 7
-                showKey = (key.column === 1) || (key.index === 7);
+                // Collapsed view: only show column 1 (keys 1-6) and column 5 (keys 7-11)
+                showKey = (key.column === 1) || (key.column === 5);
             }
             // Expanded view: show all keys (showKey remains true)
         } else {
@@ -1046,6 +1084,28 @@ function renderPreview() {
             keysLayer.append(btn);
         }
     });
+    
+    // Add More/Hide button inside preview for expandable layouts
+    if (ve.expandable_layout) {
+        var toggleBtn = $('<button>').css({
+            position: 'absolute',
+            left: (ve.schematic.screen_width / 2 - 50) + 'px',
+            bottom: '10px',
+            width: '100px',
+            height: '35px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            borderRadius: '5px',
+            border: '2px solid rgba(255,255,255,0.5)',
+            backgroundColor: 'rgba(50,50,50,0.9)',
+            color: '#fff',
+            cursor: 'pointer',
+            zIndex: 1000
+        }).html(isExpandedView ? '<i class="fa fa-minus"></i> Hide' : '<i class="fa fa-plus"></i> More').click(function() {
+            toggleExpandedView();
+        });
+        container.append(toggleBtn);
+    }
 }
 
 function editKey(index) {
@@ -1629,7 +1689,14 @@ function prefillAutoProvisionUrl() {
     if (!$('#autoProvisionUrl').val()) {
         // Use only protocol and hostname as base URL
         var baseUrl = window.location.protocol + '//' + window.location.hostname + '/';
-        $('#autoProvisionUrl').attr('placeholder', baseUrl);
+        $('#autoProvisionUrl').val(baseUrl);
+    }
+}
+
+// Pre-fill SIP Server Host with FreePBX server hostname
+function prefillSipServerHost() {
+    if (!$('#sipServerHost').val()) {
+        $('#sipServerHost').val(window.location.hostname);
     }
 }
 
