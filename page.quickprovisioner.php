@@ -431,9 +431,17 @@ $csrf_token = $_SESSION['qp_csrf'];
                                         <p class="text-muted">Click buttons to configure their function and label.</p>
                                         
                                         <!-- Page Selector -->
-                                        <div class="form-group">
+                                        <div class="form-group" id="pageSelectorGroup">
                                             <label>Page</label>
                                             <select id="pageSelect" class="form-control" onchange="renderPreview()"></select>
+                                        </div>
+
+                                        <!-- More/Hide Toggle for Expandable Layouts -->
+                                        <div class="form-group" id="toggleExpandGroup" style="display:none;">
+                                            <button type="button" id="toggleExpandBtn" class="btn btn-default" onclick="toggleExpandedView()">
+                                                <i class="fa fa-plus"></i> More
+                                            </button>
+                                            <span id="expandedViewLabel" class="text-muted" style="margin-left: 10px;">Showing collapsed view (Keys 1-6, 7)</span>
                                         </div>
 
                                         <!-- Visual Preview -->
@@ -627,6 +635,7 @@ var currentContacts = [];
 var currentDeviceId = null;
 var profiles = {};
 var smartDialShortcuts = {}; // Stores digit => extension mappings
+var isExpandedView = false; // Tracks expanded/collapsed state for expandable layouts
 
 function loadDevices() {
     $.post('ajax.php?module=quickprovisioner&command=list_devices_with_secrets', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
@@ -881,15 +890,43 @@ function loadDeviceOptions() {
     $('#deviceOptions').html(html);
 }
 
+function toggleExpandedView() {
+    isExpandedView = !isExpandedView;
+    if (isExpandedView) {
+        $('#toggleExpandBtn').html('<i class="fa fa-minus"></i> Hide');
+        $('#expandedViewLabel').text('Showing expanded view (all keys)');
+    } else {
+        $('#toggleExpandBtn').html('<i class="fa fa-plus"></i> More');
+        $('#expandedViewLabel').text('Showing collapsed view (Keys 1-6, 7)');
+    }
+    renderPreview();
+}
+
 function updatePageSelect() {
     var model = $('#model').val();
     var profile = profiles[model];
     if (!profile) return;
-    var perPage = 10; // Default; can pull from template if added
-    var maxPages = Math.ceil(profile.max_line_keys / perPage);
-    $('#pageSelect').html('');
-    for (var i = 1; i <= maxPages; i++) {
-        $('#pageSelect').append('<option value="' + i + '">Page ' + i + '</option>');
+    
+    // Check if this profile uses expandable layout
+    if (profile.visual_editor && profile.visual_editor.expandable_layout) {
+        // Hide page selector, show More/Hide toggle
+        $('#pageSelectorGroup').hide();
+        $('#toggleExpandGroup').show();
+        // Reset to collapsed view when switching models
+        isExpandedView = false;
+        $('#toggleExpandBtn').html('<i class="fa fa-plus"></i> More');
+        $('#expandedViewLabel').text('Showing collapsed view (Keys 1-6, 7)');
+    } else {
+        // Show page selector, hide More/Hide toggle
+        $('#pageSelectorGroup').show();
+        $('#toggleExpandGroup').hide();
+        // Build page selector
+        var perPage = 10; // Default; can pull from template if added
+        var maxPages = Math.ceil(profile.max_line_keys / perPage);
+        $('#pageSelect').html('');
+        for (var i = 1; i <= maxPages; i++) {
+            $('#pageSelect').append('<option value="' + i + '">Page ' + i + '</option>');
+        }
     }
 }
 
@@ -966,8 +1003,22 @@ function renderPreview() {
     var keysLayer = $('<div id="keysLayer">').css({position: 'absolute', top: 0, left: 0});
     container.append(keysLayer);
     ve.keys.forEach(function(key) {
-        // Show key if: no page attribute (single view), or page matches selected page
-        if (key.page === undefined || key.page === page) {
+        // Determine if we should show this key
+        var showKey = true;
+        
+        // For expandable layouts, check collapsed/expanded state
+        if (profile.visual_editor.expandable_layout) {
+            if (!isExpandedView) {
+                // Collapsed view: only show column 1 (keys 1-6) and key 7
+                showKey = (key.column === 1) || (key.index === 7);
+            }
+            // Expanded view: show all keys (showKey remains true)
+        } else {
+            // For page-based layouts, show key if no page attribute or page matches selected page
+            showKey = (key.page === undefined || key.page === page);
+        }
+        
+        if (showKey) {
             // Use key width/height from template if defined, otherwise use sensible defaults
             var btnWidth = key.width || 140;
             var btnHeight = key.height || 40;
