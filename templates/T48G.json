@@ -15,7 +15,8 @@
             "type": "bool",
             "default": 1,
             "label": "Enable Phone Lock",
-            "description": "Enable the phone lock feature to prevent unauthorized use. When enabled, the phone will lock after a period of inactivity and require a PIN to unlock. Useful for restricting access in shared or public spaces."
+            "description": "Enable the phone lock feature to prevent unauthorized use. When enabled, the phone will lock after a period of inactivity and require a PIN to unlock. Useful for restricting access in shared or public spaces.",
+            "category": "security"
         },
         {
             "name": "phone_setting.keyboard_lock.type",
@@ -26,14 +27,16 @@
             "options": {
                 "0": "Lock all keys (complete lockdown)",
                 "1": "Lock all except dial pad (allow dialing)"
-            }
+            },
+            "category": "security"
         },
         {
             "name": "phone_setting.keyboard_lock.password",
             "type": "text",
             "default": "1234",
             "label": "Unlock PIN",
-            "description": "The numeric PIN code required to unlock the phone (up to 15 digits). Choose a secure PIN that's easy to remember but hard to guess. Default is 1234 - strongly recommended to change this!"
+            "description": "The numeric PIN code required to unlock the phone (up to 15 digits). Choose a secure PIN that's easy to remember but hard to guess. Default is 1234 - strongly recommended to change this!",
+            "category": "security"
         },
         {
             "name": "phone_setting.keyboard_lock.timeout",
@@ -42,63 +45,72 @@
             "label": "Auto-Lock Timeout (seconds)",
             "description": "Number of seconds of inactivity before the phone automatically locks itself. Set to 0 to disable auto-lock (manual lock only). Recommended: 60-300 seconds for public/hotel use, higher for office environments.",
             "min": 0,
-            "max": 3600
+            "max": 3600,
+            "category": "security"
         },
         {
             "name": "features.enhanced_dss_keys.enable",
             "type": "bool",
             "default": 1,
             "label": "Enable Enhanced DSS Keys",
-            "description": "Enable enhanced Direct Station Selection (DSS) keys for advanced button programming. Allows line keys to have additional features like BLF (Busy Lamp Field), speed dial, intercom, and more. Keep enabled unless experiencing compatibility issues."
+            "description": "Enable enhanced Direct Station Selection (DSS) keys for advanced button programming. Allows line keys to have additional features like BLF (Busy Lamp Field), speed dial, intercom, and more. Keep enabled unless experiencing compatibility issues.",
+            "category": "features"
         },
         {
             "name": "softkey.1.enable",
             "type": "bool",
             "default": 0,
             "label": "Enable Menu Softkey",
-            "description": "Show or hide the 'Menu' softkey on the phone screen. Disable (set to 0) to prevent users from accessing settings and configuration menus - ideal for kiosks, hotel rooms, or child-restricted environments. Enable (set to 1) for normal administrative access."
+            "description": "Show or hide the 'Menu' softkey on the phone screen. Disable (set to 0) to prevent users from accessing settings and configuration menus - ideal for kiosks, hotel rooms, or child-restricted environments. Enable (set to 1) for normal administrative access.",
+            "category": "features"
         },
         {
             "name": "softkey.1.label",
             "type": "text",
             "default": "Menu",
             "label": "Menu Softkey Label",
-            "description": "Custom text label for the Menu softkey button. Only visible if Menu Softkey is enabled. You can rename it to something less obvious like 'Admin' or 'Setup' to reduce tampering attempts."
+            "description": "Custom text label for the Menu softkey button. Only visible if Menu Softkey is enabled. You can rename it to something less obvious like 'Admin' or 'Setup' to reduce tampering attempts.",
+            "category": "features"
         },
         {
             "name": "static.security.admin_password",
             "type": "text",
             "default": "NewAdminPass2026",
             "label": "Admin Password",
-            "description": "Password for accessing the phone's web interface and advanced settings menu. CRITICAL SECURITY: Change this immediately! Default passwords are publicly known and make your phone vulnerable to unauthorized configuration changes."
+            "description": "Password for accessing the phone's web interface and advanced settings menu. CRITICAL SECURITY: Change this immediately! Default passwords are publicly known and make your phone vulnerable to unauthorized configuration changes.",
+            "category": "security"
         },
         {
             "name": "static.network.web_server.enable",
             "type": "bool",
             "default": 0,
             "label": "Enable Web Interface",
-            "description": "Enable or disable the phone's built-in web interface (accessed via browser at phone's IP address). Disable (set to 0) for maximum security lockdown in public/hotel settings - phone can ONLY be configured via auto-provisioning. WARNING: Requires factory reset to re-enable!"
+            "description": "Enable or disable the phone's built-in web interface (accessed via browser at phone's IP address). Disable (set to 0) for maximum security lockdown in public/hotel settings - phone can ONLY be configured via auto-provisioning. WARNING: Requires factory reset to re-enable!",
+            "category": "security"
         },
         {
             "name": "static.zero_touch.enable",
             "type": "bool",
             "default": 0,
             "label": "Enable Zero Touch Provisioning",
-            "description": "Enable Yealink's Zero Touch auto-provisioning via RPS (Redirection and Provisioning Service). When enabled, phone attempts to get config from Yealink cloud servers on boot. Disable (set to 0) for security and to prevent accidental re-provisioning, especially in environments where users might power cycle devices."
+            "description": "Enable Yealink's Zero Touch auto-provisioning via RPS (Redirection and Provisioning Service). When enabled, phone attempts to get config from Yealink cloud servers on boot. Disable (set to 0) for security and to prevent accidental re-provisioning, especially in environments where users might power cycle devices.",
+            "category": "provisioning"
         },
         {
             "name": "phone_setting.backgrounds",
             "type": "text",
-            "default": "192.168.1.50",
+            "default": "",
             "label": "Custom Wallpaper URL",
-            "description": "URL where the phone can download a custom wallpaper image. Leave blank to use wallpaper set in Asset Manager. Format: http://server/path/wallpaper.jpg - must be accessible by the phone. Recommended size: 800x480 pixels for T48G."
+            "description": "URL where the phone can download a custom wallpaper image. Leave blank to use wallpaper set in Asset Manager. Format: http://server/path/wallpaper.jpg - must be accessible by the phone. Recommended size: 800x480 pixels for T48G.",
+            "category": "display"
         },
         {
             "name": "screensaver.enable",
             "type": "bool",
             "default": 1,
             "label": "Enable Screensaver",
-            "description": "Enable screensaver to activate after idle period. Screensaver can display a clock, image slideshow, or blank screen. Useful to reduce screen burn-in and save power. Disable if you want the screen always active with call status visible."
+            "description": "Enable screensaver to activate after idle period. Screensaver can display a clock, image slideshow, or blank screen. Useful to reduce screen burn-in and save power. Disable if you want the screen always active with call status visible.",
+            "category": "display"
         },
         {
             "name": "screensaver.wait_time",
@@ -107,35 +119,45 @@
             "label": "Screensaver Wait Time (seconds)",
             "description": "Number of seconds of inactivity before screensaver activates. Default 300 seconds (5 minutes). Set lower for quick activation in hotel/public settings, or higher for office use where screen info is needed.",
             "min": 0,
-            "max": 3600
+            "max": 3600,
+            "category": "display"
         },
         {
             "name": "screensaver.type",
-            "type": "number",
-            "default": 1,
+            "type": "select",
+            "default": "0",
             "label": "Screensaver Type",
-            "description": "Type of screensaver to display: 0=System default (usually clock), 1=Custom image, 2=Slideshow. Set to 1 and provide screensaver_upload_url for branded/custom screensaver images."
+            "description": "Type of screensaver to display when phone is idle.",
+            "options": {
+                "0": "System Default (Clock)",
+                "1": "Custom Image",
+                "2": "Slideshow"
+            },
+            "category": "display"
         },
         {
             "name": "screensaver.upload_url",
             "type": "text",
-            "default": "192.168.1.50",
+            "default": "",
             "label": "Screensaver Upload URL",
-            "description": "URL where phone can download screensaver images. Format: http://server/path/ - phone will look for images named screensaver1.jpg, screensaver2.jpg, etc. Only used if screensaver.type is set to custom image or slideshow."
+            "description": "URL where phone can download screensaver images. Format: http://server/path/ - phone will look for images named screensaver1.jpg, screensaver2.jpg, etc. Only used if screensaver.type is set to custom image or slideshow.",
+            "category": "display"
         },
         {
             "name": "account.1.display_name",
             "type": "text",
             "default": "Home Office",
             "label": "Display Name",
-            "description": "Friendly name shown on the phone's display for this SIP account. This appears in the status bar, call history, and outgoing caller ID (if your SIP provider supports it). Examples: 'John Doe', 'Room 101', 'Front Desk'."
+            "description": "Friendly name shown on the phone's display for this SIP account. This appears in the status bar, call history, and outgoing caller ID (if your SIP provider supports it). Examples: 'John Doe', 'Room 101', 'Front Desk'.",
+            "category": "display"
         },
         {
             "name": "account.1.hotline_number",
             "type": "text",
-            "default": "[PhoneNumber]",
+            "default": "",
             "label": "Hotline Number",
-            "description": "Enable hotline/auto-dial feature. When set, phone automatically dials this number when handset is lifted or speakerphone pressed. Perfect for emergency phones, elevator phones, or single-purpose phones. Leave blank to disable. Use with hotline_delay to control dial timing."
+            "description": "Enable hotline/auto-dial feature. When set, phone automatically dials this number when handset is lifted or speakerphone pressed. Perfect for emergency phones, elevator phones, or single-purpose phones. Leave blank to disable. Use with hotline_delay to control dial timing.",
+            "category": "dialing"
         },
         {
             "name": "account.1.hotline_delay",
@@ -144,7 +166,8 @@
             "label": "Hotline Delay (seconds)",
             "description": "Delay in seconds before hotline number is automatically dialed. 0 = immediate dial when handset lifted. 4 = wait 4 seconds (allows user to dial different number). Recommended: 0 for emergency phones, 3-4 for convenience hotlines.",
             "min": 0,
-            "max": 10
+            "max": 10,
+            "category": "dialing"
         },
         {
             "name": "phone_setting.inter_digit_timer",
@@ -153,7 +176,45 @@
             "label": "Inter-Digit Timeout (seconds)",
             "description": "How long the phone waits (in seconds) after the last digit is pressed before automatically dialing the number. Lower values = faster dialing but may cut off slow dialers. Higher values = more wait time between digits. Default: 2 seconds. Recommended: 1-2 for experienced users, 3-4 for elderly/inexperienced users.",
             "min": 1,
-            "max": 10
+            "max": 10,
+            "category": "dialing"
+        },
+        {
+            "name": "phone_setting.time_zone",
+            "type": "select",
+            "default": "0",
+            "label": "Time Zone",
+            "description": "Set the phone's time zone for correct clock display.",
+            "options": {
+                "-12": "UTC-12:00 (Baker Island)",
+                "-11": "UTC-11:00 (Samoa)",
+                "-10": "UTC-10:00 (Hawaii)",
+                "-9": "UTC-09:00 (Alaska)",
+                "-8": "UTC-08:00 (Pacific Time)",
+                "-7": "UTC-07:00 (Mountain Time)",
+                "-6": "UTC-06:00 (Central Time)",
+                "-5": "UTC-05:00 (Eastern Time)",
+                "-4": "UTC-04:00 (Atlantic Time)",
+                "-3": "UTC-03:00 (Buenos Aires)",
+                "-2": "UTC-02:00 (Mid-Atlantic)",
+                "-1": "UTC-01:00 (Azores)",
+                "0": "UTC+00:00 (London, GMT)",
+                "1": "UTC+01:00 (Paris, Berlin)",
+                "2": "UTC+02:00 (Cairo, Athens)",
+                "3": "UTC+03:00 (Moscow, Riyadh)",
+                "4": "UTC+04:00 (Dubai)",
+                "5": "UTC+05:00 (Karachi)",
+                "5.5": "UTC+05:30 (Mumbai, Delhi)",
+                "6": "UTC+06:00 (Dhaka)",
+                "7": "UTC+07:00 (Bangkok)",
+                "8": "UTC+08:00 (Singapore, Perth)",
+                "9": "UTC+09:00 (Tokyo, Seoul)",
+                "9.5": "UTC+09:30 (Adelaide)",
+                "10": "UTC+10:00 (Sydney, Melbourne)",
+                "11": "UTC+11:00 (Solomon Islands)",
+                "12": "UTC+12:00 (Auckland, Fiji)"
+            },
+            "category": "display"
         }
     ],
     "visual_editor": {
