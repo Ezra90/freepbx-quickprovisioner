@@ -961,14 +961,30 @@ function renderPreview() {
     var keysLayer = $('<div id="keysLayer">').css({position: 'absolute', top: 0, left: 0});
     container.append(keysLayer);
     ve.keys.forEach(function(key) {
-        if (key.page === page) {
+        // Show key if: no page attribute (single view), or page matches selected page
+        if (key.page === undefined || key.page === page) {
+            // Use key width/height from template if defined, otherwise use sensible defaults
+            var btnWidth = key.width || 140;
+            var btnHeight = key.height || 40;
+            
             var btn = $('<button>').css({
                 position: 'absolute',
                 left: key.x + 'px',
                 top: key.y + 'px',
-                width: '100px',
-                textAlign: key.label_align
-            }).text(currentKeys.find(k => k.index === key.index)?.label || key.info).click(function() {
+                width: btnWidth + 'px',
+                height: btnHeight + 'px',
+                textAlign: key.label_align || 'left',
+                fontSize: '12px',
+                padding: '5px 10px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                borderRadius: '4px',
+                border: '1px solid rgba(255,255,255,0.3)',
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                cursor: 'pointer'
+            }).text(currentKeys.find(k => k.index === key.index)?.label || 'Key ' + key.index).click(function() {
                 editKey(key.index);
             });
             keysLayer.append(btn);
