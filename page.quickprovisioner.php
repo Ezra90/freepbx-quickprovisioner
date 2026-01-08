@@ -944,13 +944,18 @@ function renderPreview() {
     }
 
     if (wallpaper) {
+        // Construct proper image URL
+        var wallpaperUrl = wallpaper;
+        if (!wallpaper.startsWith('http://') && !wallpaper.startsWith('https://')) {
+            wallpaperUrl = 'media.php?file=' + encodeURIComponent(wallpaper) + '&preview=1';
+        }
         var screenDiv = $('<div>').css({
             position: 'absolute',
             left: ve.schematic.screen_x + 'px',
             top: ve.schematic.screen_y + 'px',
             width: ve.schematic.screen_width + 'px',
             height: ve.schematic.screen_height + 'px',
-            backgroundImage: 'url(assets/uploads/' + wallpaper + ')',
+            backgroundImage: 'url(' + wallpaperUrl + ')',
             backgroundSize: mode === 'crop' ? 'cover' : 'contain',
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center'
@@ -1104,6 +1109,28 @@ function extensionSelectChanged() {
     var ext = $('#extension_select').val();
     $('#extension').val(ext);
     loadSipSecret();
+    
+    // Auto-fill Button 1 with Line key when extension is selected
+    if (ext) {
+        // Check if Button 1 (index 1) already exists
+        var button1 = currentKeys.find(k => k.index === 1);
+        if (!button1) {
+            // Add Button 1 as a line key
+            currentKeys.push({
+                index: 1,
+                type: 'line',
+                label: ext,
+                value: ext
+            });
+        } else if (!button1.type || button1.type === '') {
+            // Update Button 1 if it exists but is empty
+            button1.type = 'line';
+            button1.label = ext;
+            button1.value = ext;
+        }
+        // Refresh the preview to show the auto-filled button
+        renderPreview();
+    }
 }
 
 function loadSipSecret() {
@@ -1158,6 +1185,28 @@ function customExtensionChanged() {
     $('#extension').val(ext);
     // Clear secret when custom extension is changed
     $('#sip_secret_preview').val('');
+    
+    // Auto-fill Button 1 with Line key when extension is entered
+    if (ext) {
+        // Check if Button 1 (index 1) already exists
+        var button1 = currentKeys.find(k => k.index === 1);
+        if (!button1) {
+            // Add Button 1 as a line key
+            currentKeys.push({
+                index: 1,
+                type: 'line',
+                label: ext,
+                value: ext
+            });
+        } else if (!button1.type || button1.type === '') {
+            // Update Button 1 if it exists but is empty
+            button1.type = 'line';
+            button1.label = ext;
+            button1.value = ext;
+        }
+        // Refresh the preview to show the auto-filled button
+        renderPreview();
+    }
 }
 
 function toggleCustomSecret() {
@@ -1269,7 +1318,7 @@ function loadAssets() {
             r.files.forEach(function(file) {
                 html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
                 html += '<div class="thumbnail">';
-                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
+                html += '<img src="media.php?file=' + encodeURIComponent(file.filename) + '&preview=1" style="width:100%; height:150px; object-fit:cover;">';
                 html += '<div class="caption">';
                 html += '<p style="font-size:11px; word-break:break-all;">' + file.filename + '</p>';
                 html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
@@ -1301,7 +1350,8 @@ function updateWallpaperPreview(filename) {
         // Handle both uploaded files and custom URLs
         var imgSrc = filename;
         if (!filename.startsWith('http://') && !filename.startsWith('https://')) {
-            imgSrc = 'assets/uploads/' + filename;
+            // Use media.php endpoint for uploaded files
+            imgSrc = 'media.php?file=' + encodeURIComponent(filename) + '&preview=1';
         }
         $('#wallpaperPreviewImg').attr('src', imgSrc);
         $('#wallpaperPreview').show();
@@ -1544,10 +1594,9 @@ function updateHandsetSettingsPreview() {
 // Pre-fill auto provisioning URL with current server
 function prefillAutoProvisionUrl() {
     if (!$('#autoProvisionUrl').val()) {
-        var protocol = window.location.protocol;
-        var host = window.location.host;
-        var suggestedUrl = protocol + '//' + host + '/admin/modules/quickprovisioner/provision.php';
-        $('#autoProvisionUrl').attr('placeholder', suggestedUrl);
+        // Use only protocol and hostname as base URL
+        var baseUrl = window.location.protocol + '//' + window.location.hostname + '/';
+        $('#autoProvisionUrl').attr('placeholder', baseUrl);
     }
 }
 
@@ -1684,7 +1733,7 @@ function loadAssetGallery() {
             r.files.forEach(function(file) {
                 html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:15px;">';
                 html += '<div class="thumbnail">';
-                html += '<img src="assets/uploads/' + file.filename + '" style="width:100%; height:150px; object-fit:cover;">';
+                html += '<img src="media.php?file=' + encodeURIComponent(file.filename) + '&preview=1" style="width:100%; height:150px; object-fit:cover;">';
                 html += '<div class="caption">';
                 html += '<p style="font-size:11px; word-break:break-all;">' + file.filename + '</p>';
                 html += '<p style="font-size:10px; color:#666;">' + formatFileSize(file.size) + '</p>';
