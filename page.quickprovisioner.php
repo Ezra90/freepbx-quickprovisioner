@@ -441,7 +441,7 @@ $csrf_token = $_SESSION['qp_csrf'];
                                             <button type="button" id="toggleExpandBtn" class="btn btn-default" onclick="toggleExpandedView()">
                                                 <i class="fa fa-plus"></i> More
                                             </button>
-                                            <span id="expandedViewLabel" class="text-muted" style="margin-left: 10px;">Showing collapsed view (Keys 1-6, 7)</span>
+                                            <span id="expandedViewLabel" class="text-muted" style="margin-left: 10px;">Showing collapsed view (Keys 1-6, 7-11)</span>
                                         </div>
 
                                         <!-- Visual Preview -->
