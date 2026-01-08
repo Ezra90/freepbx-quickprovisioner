@@ -1119,7 +1119,7 @@ function autoFillButton1(ext) {
             label: ext,
             value: ext
         });
-    } else if (!button1.type || button1.type === '') {
+    } else if (!button1.type) {
         // Update Button 1 if it exists but is empty
         button1.type = 'line';
         button1.label = ext;
