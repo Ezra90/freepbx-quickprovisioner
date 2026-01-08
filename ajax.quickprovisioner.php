@@ -36,6 +36,10 @@ global $db;
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+// Ensure CSRF token exists in session
+if (!isset($_SESSION['qp_csrf'])) {
+    $_SESSION['qp_csrf'] = bin2hex(random_bytes(32));
+}
 // Support both 'command' (FreePBX routing via ajax.php) and 'action' (backward compatibility for direct calls)
 $action = $_REQUEST['command'] ?? $_REQUEST['action'] ?? '';
 $response = ['status' => false, 'message' => 'Invalid action'];
