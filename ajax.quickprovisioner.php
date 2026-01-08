@@ -1,11 +1,19 @@
 <?php
 // ajax.quickprovisioner.php - HH Quick Provisioner v2.2 - Backend API
 
-// Configuration constants
-define('QP_FREEPBX_BASE_PATH', '/var/www/html');
-define('QP_GIT_COMMAND', '/usr/bin/git');
-define('QP_FWCONSOLE_RELOAD', '/usr/sbin/fwconsole reload');
-define('QP_FWCONSOLE_RESTART', '/usr/sbin/fwconsole restart');
+// Configuration constants (only define if not already defined by Quickprovisioner.class.php)
+if (!defined('QP_FREEPBX_BASE_PATH')) {
+    define('QP_FREEPBX_BASE_PATH', '/var/www/html');
+}
+if (!defined('QP_GIT_COMMAND')) {
+    define('QP_GIT_COMMAND', '/usr/bin/git');
+}
+if (!defined('QP_FWCONSOLE_RELOAD')) {
+    define('QP_FWCONSOLE_RELOAD', '/usr/sbin/fwconsole reload');
+}
+if (!defined('QP_FWCONSOLE_RESTART')) {
+    define('QP_FWCONSOLE_RESTART', '/usr/sbin/fwconsole restart');
+}
 
 function qp_is_local_network() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';

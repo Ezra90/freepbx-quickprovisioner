@@ -62,7 +62,8 @@ if ($mac && ($req_w == 0 || $req_h == 0)) {
     global $db;
     $device = $db->getRow("SELECT model FROM quickprovisioner_devices WHERE mac=?", [$mac]);
     if ($device) {
-        $profile_path = __DIR__ . '/templates/' . $device['model'] . '.json';
+        $model = basename($device['model']); // Sanitize to prevent path traversal
+        $profile_path = __DIR__ . '/templates/' . $model . '.json';
         if (file_exists($profile_path)) {
             $profile = json_decode(file_get_contents($profile_path), true);
             $sch = $profile['visual_editor']['schematic'] ?? null;
