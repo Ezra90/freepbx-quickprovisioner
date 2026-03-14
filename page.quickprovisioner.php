@@ -45,7 +45,7 @@ if (!isset($_SESSION['qp_csrf'])) {
 $csrf_token = $_SESSION['qp_csrf'];
 ?>
 <div class="container-fluid">
-    <h1>Quick Provisioner v3.0.0</h1>
+    <h1>Quick Provisioner <small class="text-muted">0.1-dev</small></h1>
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
@@ -562,7 +562,7 @@ account.{{line_index}}.enable = 1
                 </div>
                 <div class="panel-body">
                     <div class="form-group">
-                        <strong>Current Version:</strong> <span id="currentVersion">2.2.0</span>
+                        <strong>Current Version:</strong> <span id="currentVersion">0.1-dev</span>
                     </div>
                     <div class="form-group">
                         <strong>Git Commit:</strong> <span id="currentCommit">Loading...</span>
