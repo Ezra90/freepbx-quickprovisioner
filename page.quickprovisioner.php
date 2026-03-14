@@ -1886,10 +1886,10 @@ function uploadRingtone() {
 
 function loadRingtones() {
     $.post('ajax.php?module=quickprovisioner&command=list_ringtones', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
-        if (r.status && r.list) {
+        if (r.status && r.files) {
             var html = '';
-            r.list.forEach(function(item) {
-                var escaped = $('<div>').text(item).html();
+            r.files.forEach(function(item) {
+                var escaped = $('<div>').text(item.filename).html();
                 html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:10px;">';
                 html += '<div class="panel panel-default"><div class="panel-body text-center">';
                 html += '<i class="fa fa-music"></i> ' + escaped;
@@ -1944,10 +1944,10 @@ function uploadFirmware() {
 
 function loadFirmware() {
     $.post('ajax.php?module=quickprovisioner&command=list_firmware', {csrf_token: '<?= $csrf_token ?>'}, function(r) {
-        if (r.status && r.list) {
+        if (r.status && r.files) {
             var html = '';
-            r.list.forEach(function(item) {
-                var escaped = $('<div>').text(item).html();
+            r.files.forEach(function(item) {
+                var escaped = $('<div>').text(item.filename).html();
                 html += '<div class="col-xs-6 col-sm-4 col-md-3" style="margin-bottom:10px;">';
                 html += '<div class="panel panel-default"><div class="panel-body text-center">';
                 html += '<i class="fa fa-microchip"></i> ' + escaped;
