@@ -1,5 +1,5 @@
 <?php
-// MustacheEngine.php - Lightweight Mustache renderer & META parser for HH Quick Provisioner
+// MustacheEngine.php - Lightweight Mustache renderer & META parser for Quick Provisioner
 // Compatible with Pocket-Provisioner Android app template format (.mustache files with META blocks)
 
 /**

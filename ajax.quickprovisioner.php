@@ -1,5 +1,5 @@
 <?php
-// ajax.quickprovisioner.php - HH Quick Provisioner v3.0.0 - Backend API
+// ajax.quickprovisioner.php - Quick Provisioner v3.0.0 - Backend API
 
 // Configuration constants (only define if not already defined by Quickprovisioner.class.php)
 if (!defined('QP_FREEPBX_BASE_PATH')) {
@@ -729,21 +729,12 @@ switch ($action) {
 
         // Get current version from module.xml
         $module_xml_path = $real_module_dir . '/module.xml';
-        $current_version = '2.1.0'; // Default
+        $current_version = '3.0.0'; // Default
         if (file_exists($module_xml_path)) {
             $xml_content = @file_get_contents($module_xml_path);
             if ($xml_content && preg_match('/<version>(.*?)<\/version>/', $xml_content, $matches)) {
                 $current_version = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
             }
-        }
-
-        // Set SSH key for git operations if it exists
-        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
-        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
-        } else {
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
 
         // Fetch from origin
@@ -789,15 +780,6 @@ switch ($action) {
         if ($real_module_dir === false || strpos($real_module_dir, QP_FREEPBX_BASE_PATH) !== 0) {
             $response['message'] = 'Invalid module directory';
             break;
-        }
-
-        // Set SSH key for git operations if it exists
-        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
-        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
-        } else {
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
         }
 
         // Use git -C instead of cd for security
@@ -848,15 +830,6 @@ switch ($action) {
 
         // Get current commit before update
         $old_commit = trim(shell_exec($git_cmd . ' rev-parse HEAD 2>&1'));
-
-        // Set SSH key for git operations if it exists
-        $ssh_key_path = '/home/hhvoip/.ssh/id_github';
-        if (file_exists($ssh_key_path) && is_readable($ssh_key_path)) {
-            putenv('GIT_SSH_COMMAND=ssh -i ' . escapeshellarg($ssh_key_path) . ' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new');
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: Using SSH key: $ssh_key_path");
-        } else {
-            \FreePBX::create()->Logger->log(FPBX_LOG_INFO, "Quick Provisioner: SSH key not found at $ssh_key_path, proceeding without custom key");
-        }
 
         // Perform git pull
         $pull_output = shell_exec($git_cmd . ' pull origin main 2>&1');

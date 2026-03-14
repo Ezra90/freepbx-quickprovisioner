@@ -45,7 +45,7 @@ if (!isset($_SESSION['qp_csrf'])) {
 $csrf_token = $_SESSION['qp_csrf'];
 ?>
 <div class="container-fluid">
-    <h1>HH Quick Provisioner v2.2.0</h1>
+    <h1>Quick Provisioner v3.0.0</h1>
 
     <ul class="nav nav-tabs" role="tablist">
         <li class="active"><a data-toggle="tab" href="#tab-list" onclick="loadDevices()">Device List</a></li>
